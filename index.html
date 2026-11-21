@@ -22,11 +22,11 @@
             touch-action: manipulation;
         }
 
-        /* 画面左上の言語切り替えボタン */
+        /* 画面右上の言語切り替えボタン */
         .lang-btn {
             position: absolute;
             top: 16px;
-            left: 16px;
+            right: 16px;
             padding: 8px 16px;
             font-size: 13px;
             font-weight: bold;
@@ -66,6 +66,64 @@
             touch-action: manipulation;
         }
 
+        #titleScreen {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            box-sizing: border-box;
+            padding: 24px;
+            border-radius: 12px;
+            background-color: rgba(15, 23, 42, 0.76);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            text-align: center;
+        }
+
+        #titleLogo {
+            margin: 0;
+            color: #fef08a;
+            font-size: clamp(24px, 5vw, 36px);
+            line-height: 1.2;
+            text-shadow: 0 3px 12px rgba(0, 0, 0, 0.65);
+        }
+
+        #titlePlayBtn {
+            min-width: 190px;
+            padding: 14px 28px;
+            border: 2px solid #fde68a;
+            border-radius: 30px;
+            background-color: #f59e0b;
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 16px rgba(245, 158, 11, 0.45);
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        #titlePlayBtn:hover {
+            background-color: #d97706;
+            transform: scale(1.04);
+        }
+
+        #titlePlayBtn:focus-visible {
+            outline: 3px solid #ffffff;
+            outline-offset: 3px;
+        }
+
+        #titleGuide {
+            max-width: 440px;
+            margin: 0;
+            color: #e2e8f0;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-line;
+        }
+
         /* ゲームオーバー時のオーバーレイ画面 */
         #gameOverScreen {
             position: absolute;
@@ -80,6 +138,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            z-index: 30;
         }
 
         #gameOverScreen h2 {
@@ -136,11 +195,19 @@
 
 <body>
 
-    <!-- 画面左上の言語切り替えボタン -->
+    <!-- 画面右上の言語切り替えボタン -->
     <button id="langToggleBtn" class="lang-btn" aria-label="Switch Language">JP / EN</button>
 
     <div class="game-container">
         <canvas id="gameCanvas" width="600" height="300"></canvas>
+
+        <!-- タイトル画面 -->
+        <div id="titleScreen" aria-labelledby="titleLogo">
+            <h1 id="titleLogo">黒ネコの大冒険！</h1>
+            <button id="titlePlayBtn" type="button">PLAY（スタート）</button>
+            <p id="titleGuide">タップ / クリック / Space / ↑キーで開始・ジャンプ
+空中でもう一度押すと2段ジャンプ！</p>
+        </div>
 
         <!-- ゲームオーバー画面 -->
         <div id="gameOverScreen">
@@ -152,7 +219,7 @@
             <button id="retryBtn">もう一度遊ぶ</button>
         </div>
     </div>
-    <p id="instructionText">スペース / ↑キー / タップで2段ジャンプ！お魚(+5)を集めてサボテンを飛び越えよう</p>
+    <p id="instructionText" hidden>スペース / ↑キー / タップで2段ジャンプ！お魚(+5)を集めてサボテンを飛び越えよう</p>
 
     <script>
         // --- 多言語（i18n）データ設定 ---
@@ -160,6 +227,9 @@
             ja: {
                 pageTitle: "黒ネコの大冒険！ - ワンタップジャンプ",
                 instruction: "スペース / ↑キー / タップで2段ジャンプ！お魚(+5)を集めてサボテンを飛び越えよう",
+                titleLogo: "黒ネコの大冒険！",
+                titlePlay: "PLAY（スタート）",
+                titleGuide: "タップ / クリック / Space / ↑キーで開始・ジャンプ\n空中でもう一度押すと2段ジャンプ！",
                 gameOver: "GAME OVER",
                 retry: "もう一度遊ぶ",
                 scoreLabel: "スコア",
@@ -169,6 +239,9 @@
             en: {
                 pageTitle: "Black Cat's Adventure",
                 instruction: "Space / Up Arrow / Tap for Double Jump! Collect fish (+5) & dodge cacti!",
+                titleLogo: "Kuro Cat Run!",
+                titlePlay: "PLAY",
+                titleGuide: "Tap / Click / Space / ↑ to start or jump\nJump again in the air for a double jump!",
                 gameOver: "GAME OVER",
                 retry: "RETRY",
                 scoreLabel: "SCORE",
@@ -291,6 +364,10 @@
         const finalBestLabel = document.getElementById("finalBestLabel");
         const retryBtn = document.getElementById("retryBtn");
         const langToggleBtn = document.getElementById("langToggleBtn");
+        const titleScreen = document.getElementById("titleScreen");
+        const titleLogo = document.getElementById("titleLogo");
+        const titlePlayBtn = document.getElementById("titlePlayBtn");
+        const titleGuide = document.getElementById("titleGuide");
 
         function applyLanguage(lang) {
             currentLang = lang;
@@ -304,6 +381,9 @@
             finalBestLabel.textContent = t.bestLabel + ":";
             retryBtn.textContent = t.retry;
             langToggleBtn.textContent = t.langBtn;
+            titleLogo.textContent = t.titleLogo;
+            titlePlayBtn.textContent = t.titlePlay;
+            titleGuide.textContent = t.titleGuide;
 
             // ステージバナーテキストも現在の言語に同期
             if (stageBanner) {
@@ -462,7 +542,13 @@
         const jumpPower = -12;
 
         // ゲームの状態管理
-        let isGameOver = false;
+        const GAME_STATE = {
+            TITLE: "TITLE",
+            PLAYING: "PLAYING",
+            GAME_OVER: "GAME_OVER"
+        };
+        let gameState = GAME_STATE.TITLE;
+        let ignoreJumpUntilKeyRelease = false;
         let obstacles = [];
         let coins = [];
         let floatingTexts = []; // +5 ポップアップ演出用
@@ -549,9 +635,6 @@
             }
         }
 
-        // 初期バナーの表示
-        showStageBanner(0);
-
         // プレイヤーの設定（二段ジャンプ・スピン演出対応）
         const player = {
             x: 80,
@@ -568,8 +651,8 @@
 
         // ジャンプ処理（二段ジャンプ対応）
         function jump() {
+            if (gameState !== GAME_STATE.PLAYING) return;
             initAudio(); // ユーザー操作契機でオーディオをアンロック
-            if (isGameOver) return;
 
             if (player.jumpCount === 0 && player.isGrounded) {
                 // 1段目ジャンプ
@@ -587,10 +670,20 @@
             }
         }
 
+        function startGame() {
+            if (gameState !== GAME_STATE.TITLE) return;
+
+            initAudio();
+            showStageBanner(0);
+            gameState = GAME_STATE.PLAYING;
+            titleScreen.style.display = "none";
+            instructionText.hidden = false;
+        }
+
         // ゲームを初期状態にリセット（リトライ）する処理
         function resetGame() {
             initAudio();
-            isGameOver = false;
+            gameState = GAME_STATE.PLAYING;
             obstacles = [];
             coins = [];
             floatingTexts = [];
@@ -611,6 +704,8 @@
             player.jumpCount = 0;
             player.rotation = 0;
             player.isSpinning = false;
+            titleScreen.style.display = "none";
+            instructionText.hidden = false;
             gameOverScreen.style.display = "none";
         }
 
@@ -618,7 +713,14 @@
         window.addEventListener("keydown", (e) => {
             if (e.code === "Space" || e.code === "ArrowUp") {
                 e.preventDefault();
-                if (isGameOver) {
+                if (gameState === GAME_STATE.TITLE) {
+                    ignoreJumpUntilKeyRelease = true;
+                    startGame();
+                    return;
+                }
+                if (ignoreJumpUntilKeyRelease) return;
+                if (gameState === GAME_STATE.GAME_OVER) {
+                    ignoreJumpUntilKeyRelease = true;
                     resetGame(); // ゲームオーバー中ならスペースキーでもリトライ可能！
                 } else {
                     jump();
@@ -626,10 +728,18 @@
             }
         });
 
+        window.addEventListener("keyup", (e) => {
+            if (e.code === "Space" || e.code === "ArrowUp") {
+                ignoreJumpUntilKeyRelease = false;
+            }
+        });
+
         // 画面クリック・タップ操作
         canvas.addEventListener("pointerdown", () => {
             jump();
         });
+
+        titlePlayBtn.addEventListener("click", startGame);
 
         // リトライボタンのクリック
         retryBtn.addEventListener("click", () => {
@@ -706,7 +816,13 @@
 
         // 毎フレームの計算
         function update() {
-            if (isGameOver) return; // ゲームオーバー中は計算を止める
+            if (gameState === GAME_STATE.TITLE) {
+                if (player.isGrounded) {
+                    runAnimTick += 0.08;
+                }
+                return;
+            }
+            if (gameState !== GAME_STATE.PLAYING) return; // ゲームオーバー中は計算を止める
 
             // スコア加算（1秒に+1：約60fpsで60フレームごとに1加算）
             scoreTicks++;
@@ -878,7 +994,7 @@
 
                 // 当たり判定チェック
                 if (checkCollision(player, obs)) {
-                    isGameOver = true;
+                    gameState = GAME_STATE.GAME_OVER;
                     playGameOverSound();
 
                     // ハイスコア更新判定と保存
