@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">黒ネコの大冒険！ - ワンタップジャンプ</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #0d1117;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            position: relative;
+        }
+
+        /* 画面左上の言語切り替えボタン */
+        .lang-btn {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #fbbf24;
+            background-color: rgba(30, 27, 75, 0.85);
+            border: 1px solid #4338ca;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+            outline: none;
+            z-index: 100;
+        }
+
+        .lang-btn:hover {
+            background-color: #4338ca;
+            color: #ffffff;
+            border-color: #fbbf24;
+            transform: scale(1.05);
+        }
+
+        .game-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #0f172a;
+            border: 3px solid #312e81;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+            max-width: 95vw;
+            cursor: pointer;
+        }
+
+        /* ゲームオーバー時のオーバーレイ画面 */
+        #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(15, 23, 42, 0.88);
+            border-radius: 12px;
+            display: none;
+            /* 最初は隠しておく */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #gameOverScreen h2 {
+            margin: 0 0 10px 0;
+            font-size: 34px;
+            color: #f43f5e;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 10px rgba(244, 63, 94, 0.4);
+        }
+
+        .game-over-stats {
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 16px;
+            color: #cbd5e1;
+        }
+
+        .game-over-stats div {
+            margin: 4px 0;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #fbbf24;
+        }
+
+        #retryBtn {
+            padding: 10px 26px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ffffff;
+            background-color: #f59e0b;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(245, 158, 11, 0.5);
+            transition: transform 0.15s, background-color 0.2s;
+        }
+
+        #retryBtn:hover {
+            transform: scale(1.05);
+            background-color: #d97706;
+        }
+
+        p {
+            margin-top: 14px;
+            font-size: 14px;
+            color: #94a3b8;
+            text-align: center;
+            padding: 0 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 画面左上の言語切り替えボタン -->
+    <button id="langToggleBtn" class="lang-btn" aria-label="Switch Language">JP / EN</button>
+
+    <div class="game-container">
+        <canvas id="gameCanvas" width="600" height="300"></canvas>
+
+        <!-- ゲームオーバー画面 -->
+        <div id="gameOverScreen">
+            <h2 id="gameOverHeading">GAME OVER</h2>
+            <div class="game-over-stats">
+                <div><span id="finalScoreLabel">スコア:</span> <span id="finalScoreVal" class="stat-value">0</span></div>
+                <div><span id="finalBestLabel">ハイスコア:</span> <span id="finalBestVal" class="stat-value">0</span></div>
+            </div>
+            <button id="retryBtn">もう一度遊ぶ</button>
+        </div>
+    </div>
+    <p id="instructionText">スペース / ↑キー / タップで2段ジャンプ！お魚(+5)を集めてサボテンを飛び越えよう</p>
+
+    <script>
+        // --- 多言語（i18n）データ設定 ---
+        const i18n = {
+            ja: {
+                pageTitle: "黒ネコの大冒険！ - ワンタップジャンプ",
+                instruction: "スペース / ↑キー / タップで2段ジャンプ！お魚(+5)を集めてサボテンを飛び越えよう",
+                gameOver: "GAME OVER",
+                retry: "もう一度遊ぶ",
+                scoreLabel: "スコア",
+                bestLabel: "ハイスコア",
+                langBtn: "JP / EN (日本語)"
+            },
+            en: {
+                pageTitle: "Black Cat's Adventure",
+                instruction: "Space / Up Arrow / Tap for Double Jump! Collect fish (+5) & dodge cacti!",
+                gameOver: "GAME OVER",
+                retry: "RETRY",
+                scoreLabel: "SCORE",
+                bestLabel: "BEST",
+                langBtn: "JP / EN (English)"
+            }
+        };
+
+        // 初期言語判定: navigator.language が日本語(ja)なら日本語、それ以外は英語
+        const browserLang = (navigator.language || navigator.userLanguage || "").toLowerCase();
+        let currentLang = browserLang.startsWith("ja") ? "ja" : "en";
+
+        // --- 無限ループする景色の変化（ステージ演出）の定義 ---
+        const STAGE_THEMES = [
+            // 0: DAY (爽やかな昼間の青空)
+            {
+                name: "DAY",
+                nameJa: "昼 (DAY)",
+                skyTop: [56, 189, 248],     // #38bdf8
+                skyBottom: [186, 230, 253], // #bae6fd
+                grassTop: [34, 197, 94],    // #22c55e
+                grassBottom: [21, 128, 61], // #15803d
+                grassStripe: "#86efac",
+                starAlpha: 0.0,
+                cloudAlpha: 0.55,
+                type: "day"
+            },
+            // 1: SUNSET (綺麗な夕暮れ・オレンジ〜紫)
+            {
+                name: "SUNSET",
+                nameJa: "夕暮れ (SUNSET)",
+                skyTop: [67, 56, 202],      // #4338ca
+                skyBottom: [249, 115, 22],  // #f97316
+                grassTop: [16, 185, 129],   // #10b981
+                grassBottom: [6, 78, 59],   // #064e3b
+                grassStripe: "#34d399",
+                starAlpha: 0.35,
+                cloudAlpha: 0.45,
+                type: "sunset"
+            },
+            // 2: NIGHT (満天の星空)
+            {
+                name: "NIGHT",
+                nameJa: "星空 (NIGHT)",
+                skyTop: [11, 15, 25],       // #0b0f19
+                skyBottom: [59, 30, 84],    // #3b1e54
+                grassTop: [5, 150, 105],    // #059669
+                grassBottom: [4, 47, 46],   // #042f2e
+                grassStripe: "#10b981",
+                starAlpha: 0.85,
+                cloudAlpha: 0.2,
+                type: "night"
+            },
+            // 3: SPACE (神秘的な宇宙空間・星雲や流れ星)
+            {
+                name: "SPACE",
+                nameJa: "宇宙 (SPACE)",
+                skyTop: [2, 6, 23],         // #020617
+                skyBottom: [88, 28, 135],   // #581c87
+                grassTop: [13, 148, 136],   // #0d9488
+                grassBottom: [17, 24, 39],  // #111827
+                grassStripe: "#2dd4bf",
+                starAlpha: 1.0,
+                cloudAlpha: 0.35,
+                type: "space"
+            }
+        ];
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function lerpColor(c1, c2, t) {
+            return [
+                Math.round(lerp(c1[0], c2[0], t)),
+                Math.round(lerp(c1[1], c2[1], t)),
+                Math.round(lerp(c1[2], c2[2], t))
+            ];
+        }
+
+        function getStageTitle(stageIdx, lang) {
+            const stageNum = stageIdx + 1;
+            const themeIdx = stageIdx % 4;
+            const isLoop = stageIdx >= 4;
+            const t = STAGE_THEMES[themeIdx];
+
+            let titleName = t.name;
+            if (isLoop && themeIdx === 0) {
+                titleName = "NEW DAY";
+            }
+
+            if (lang === "ja") {
+                const jaName = (isLoop && themeIdx === 0) ? "新しい朝 (NEW DAY)" : t.nameJa;
+                return `STAGE ${stageNum}: ${jaName}`;
+            } else {
+                return `STAGE ${stageNum}: ${titleName}`;
+            }
+        }
+
+        let currentStageIndex = 0;
+        let stageBanner = {
+            stageIdx: 0,
+            text: "",
+            alpha: 0,
+            timer: 0
+        };
+
+        function showStageBanner(stageIdx) {
+            currentStageIndex = stageIdx;
+            stageBanner.stageIdx = stageIdx;
+            stageBanner.text = getStageTitle(stageIdx, currentLang);
+            stageBanner.timer = 150; // 約2.5秒表示
+            stageBanner.alpha = 1.0;
+        }
+
+        const pageTitle = document.getElementById("pageTitle");
+        const instructionText = document.getElementById("instructionText");
+        const gameOverHeading = document.getElementById("gameOverHeading");
+        const finalScoreLabel = document.getElementById("finalScoreLabel");
+        const finalBestLabel = document.getElementById("finalBestLabel");
+        const retryBtn = document.getElementById("retryBtn");
+        const langToggleBtn = document.getElementById("langToggleBtn");
+
+        function applyLanguage(lang) {
+            currentLang = lang;
+            document.documentElement.lang = lang;
+            const t = i18n[lang];
+
+            pageTitle.textContent = t.pageTitle;
+            instructionText.textContent = t.instruction;
+            gameOverHeading.textContent = t.gameOver;
+            finalScoreLabel.textContent = t.scoreLabel + ":";
+            finalBestLabel.textContent = t.bestLabel + ":";
+            retryBtn.textContent = t.retry;
+            langToggleBtn.textContent = t.langBtn;
+
+            // ステージバナーテキストも現在の言語に同期
+            if (stageBanner) {
+                stageBanner.text = getStageTitle(stageBanner.stageIdx, lang);
+            }
+        }
+
+        langToggleBtn.addEventListener("click", () => {
+            const nextLang = currentLang === "ja" ? "en" : "ja";
+            applyLanguage(nextLang);
+        });
+
+        // 初期言語をUIに適用
+        applyLanguage(currentLang);
+
+
+        // --- Web Audio API によるレトロ効果音 ---
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === "suspended") {
+                audioCtx.resume();
+            }
+        }
+
+        // 1段目ジャンプ音「ピョコッ」
+        function playJumpSound() {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = "sine";
+                const now = audioCtx.currentTime;
+
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(650, now + 0.12);
+
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.12);
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+
+        // 2段目ジャンプ音「ピュィッ！」 (1段目より高いピッチ)
+        function playDoubleJumpSound() {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = "sine";
+                const now = audioCtx.currentTime;
+
+                // 450Hz から 950Hz へ急上昇
+                osc.frequency.setValueAtTime(450, now);
+                osc.frequency.exponentialRampToValueAtTime(950, now + 0.12);
+
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.12);
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+
+        // コイン獲得音「ピロリン」 (2音の爽快なレトロチャイム)
+        function playCoinSound() {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = "sine";
+                // B5 (988Hz) -> E6 (1319Hz)
+                osc.frequency.setValueAtTime(988, now);
+                osc.frequency.setValueAtTime(1319, now + 0.08);
+
+                gain.gain.setValueAtTime(0.22, now);
+                gain.gain.setValueAtTime(0.26, now + 0.08);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.32);
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+
+        // ゲームオーバー音「ブー」
+        function playGameOverSound() {
+            try {
+                initAudio();
+                if (!audioCtx) return;
+
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = "sawtooth";
+                const now = audioCtx.currentTime;
+
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(60, now + 0.35);
+
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } catch (e) {
+                console.error("Audio error:", e);
+            }
+        }
+
+
+        // --- ゲーム本体の処理 ---
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const gameOverScreen = document.getElementById("gameOverScreen");
+        const finalScoreVal = document.getElementById("finalScoreVal");
+        const finalBestVal = document.getElementById("finalBestVal");
+
+        const groundY = 250;
+        const gravity = 0.6;
+        const jumpPower = -12;
+
+        // ゲームの状態管理
+        let isGameOver = false;
+        let obstacles = [];
+        let coins = [];
+        let floatingTexts = []; // +5 ポップアップ演出用
+        const baseSpeed = 5;
+        let gameSpeed = baseSpeed;
+        let spawnTimer = 0;
+        let nextSpawnInterval = 90;
+        let coinSpawnTimer = 0;
+        let nextCoinInterval = 110;
+
+        // 背景演出用データ（星・雲・芝生スクロール・歩行アニメ）
+        const bgStars = [];
+        for (let i = 0; i < 32; i++) {
+            bgStars.push({
+                x: Math.random() * 600,
+                y: Math.random() * 190,
+                radius: Math.random() * 1.5 + 0.6,
+                twinkle: Math.random() * Math.PI * 2
+            });
+        }
+
+        const bgClouds = [
+            { x: 50, y: 35, scale: 0.9 },
+            { x: 230, y: 65, scale: 1.15 },
+            { x: 440, y: 40, scale: 0.95 },
+            { x: 610, y: 70, scale: 0.85 }
+        ];
+
+        let groundOffset = 0;
+        let runAnimTick = 0;
+
+        // --- ハイスコア自動保存（localStorage による永続化） ---
+        const HIGH_SCORE_STORAGE_KEY = "blackCatJump_savedHighScore";
+
+        function loadStoredHighScore() {
+            try {
+                const val = localStorage.getItem(HIGH_SCORE_STORAGE_KEY) || localStorage.getItem("jumpGame_highScore");
+                return val ? Math.max(0, parseInt(val, 10) || 0) : 0;
+            } catch (e) {
+                console.warn("Could not load high score from localStorage:", e);
+                return 0;
+            }
+        }
+
+        function saveStoredHighScore(val) {
+            try {
+                localStorage.setItem(HIGH_SCORE_STORAGE_KEY, val.toString());
+                localStorage.setItem("jumpGame_highScore", val.toString()); // 互換用
+            } catch (e) {
+                console.warn("Could not save high score to localStorage:", e);
+            }
+        }
+
+        // 角丸長方形描画ヘルパー（全ブラウザ互換）
+        function drawRoundRect(context, x, y, width, height, radius) {
+            if (context.roundRect) {
+                context.roundRect(x, y, width, height, radius);
+            } else {
+                context.moveTo(x + radius, y);
+                context.lineTo(x + width - radius, y);
+                context.quadraticCurveTo(x + width, y, x + width, y + radius);
+                context.lineTo(x + width, y + height - radius);
+                context.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                context.lineTo(x + radius, y + height);
+                context.quadraticCurveTo(x, y + height, x, y + height - radius);
+                context.lineTo(x, y + radius);
+                context.quadraticCurveTo(x, y, x + radius, y);
+            }
+        }
+
+        // 宇宙ステージ用の流れ星配列
+        let shootingStars = [];
+
+        // スコア管理
+        let score = 0;
+        let scoreTicks = 0;
+        let highScore = loadStoredHighScore(); // localStorage から安全にハイスコア読み込み
+        const FLYING_ENEMY_SCORE_THRESHOLD = 15; // 飛行敵が出現し始めるスコア（約10〜15秒後）
+
+        function checkAndUpdateHighScore() {
+            if (score > highScore) {
+                highScore = score;
+                saveStoredHighScore(highScore); // リアルタイムで localStorage に自動保存！
+            }
+        }
+
+        // 初期バナーの表示
+        showStageBanner(0);
+
+        // プレイヤーの設定（二段ジャンプ・スピン演出対応）
+        const player = {
+            x: 80,
+            y: groundY - 40,
+            width: 40,
+            height: 40,
+            color: "#111827",  // 黒ネコ
+            vy: 0,
+            isGrounded: true,
+            jumpCount: 0,      // ジャンプ回数（0: 地面, 1: 1段目, 2: 2段目）
+            rotation: 0,       // 回転角度
+            isSpinning: false  // 2段ジャンプ回転中フラグ
+        };
+
+        // ジャンプ処理（二段ジャンプ対応）
+        function jump() {
+            initAudio(); // ユーザー操作契機でオーディオをアンロック
+            if (isGameOver) return;
+
+            if (player.jumpCount === 0 && player.isGrounded) {
+                // 1段目ジャンプ
+                player.vy = jumpPower;
+                player.isGrounded = false;
+                player.jumpCount = 1;
+                playJumpSound();
+            } else if (player.jumpCount === 1) {
+                // 2段目ジャンプ（空中ジャンプ）
+                player.vy = jumpPower * 0.95;
+                player.jumpCount = 2;
+                player.isSpinning = true;
+                player.rotation = 0;
+                playDoubleJumpSound();
+            }
+        }
+
+        // ゲームを初期状態にリセット（リトライ）する処理
+        function resetGame() {
+            initAudio();
+            isGameOver = false;
+            obstacles = [];
+            coins = [];
+            floatingTexts = [];
+            shootingStars = [];
+            spawnTimer = 0;
+            nextSpawnInterval = 90;
+            coinSpawnTimer = 0;
+            nextCoinInterval = 110;
+            groundOffset = 0;
+            runAnimTick = 0;
+            score = 0;
+            scoreTicks = 0;
+            gameSpeed = baseSpeed;
+            showStageBanner(0);
+            player.y = groundY - player.height;
+            player.vy = 0;
+            player.isGrounded = true;
+            player.jumpCount = 0;
+            player.rotation = 0;
+            player.isSpinning = false;
+            gameOverScreen.style.display = "none";
+        }
+
+        // キーボード操作（スペース・上矢印キー）
+        window.addEventListener("keydown", (e) => {
+            if (e.code === "Space" || e.code === "ArrowUp") {
+                e.preventDefault();
+                if (isGameOver) {
+                    resetGame(); // ゲームオーバー中ならスペースキーでもリトライ可能！
+                } else {
+                    jump();
+                }
+            }
+        });
+
+        // 画面クリック・タップ操作
+        canvas.addEventListener("pointerdown", () => {
+            jump();
+        });
+
+        // リトライボタンのクリック
+        retryBtn.addEventListener("click", () => {
+            resetGame();
+        });
+
+        // 障害物の生成（地面の赤い敵 or 空飛ぶ紫の敵）
+        function spawnObstacle() {
+            // スコア15点以上なら約35%の確率で紫色の飛行敵が出現
+            const canSpawnFlying = score >= FLYING_ENEMY_SCORE_THRESHOLD;
+            const isFlying = canSpawnFlying && Math.random() < 0.35;
+
+            if (isFlying) {
+                // 空飛ぶ敵（紫色）: 地面に立っていれば頭上をやり過ごせる高さ(y: 155〜175)
+                const width = 32;
+                const height = 18;
+                obstacles.push({
+                    x: canvas.width,
+                    y: 158,
+                    width: width,
+                    height: height,
+                    color: "#a55eea",
+                    type: "flying",
+                    wingAngle: 0
+                });
+            } else {
+                // 地面の赤い障害物
+                const height = Math.floor(Math.random() * 26) + 30;
+                const width = 25;
+                obstacles.push({
+                    x: canvas.width,
+                    y: groundY - height,
+                    width: width,
+                    height: height,
+                    color: "#e94560",
+                    type: "ground"
+                });
+            }
+        }
+
+        // ボーナスコインの生成
+        function spawnCoin() {
+            // 中くらいの高さ(160)または高い位置(105)に配置
+            const heights = [105, 160];
+            const targetY = heights[Math.floor(Math.random() * heights.length)];
+            coins.push({
+                x: canvas.width,
+                y: targetY,
+                baseY: targetY,
+                radius: 11,
+                angle: Math.random() * Math.PI * 2
+            });
+        }
+
+        // 四角形同士の当たり判定（少しだけ判定を甘くして遊びやすく調整）
+        function checkCollision(p, obs) {
+            const margin = 4; // 4px分だけ判定を内側にして理不尽な接触を防ぐ
+            return (
+                p.x + margin < obs.x + obs.width - margin &&
+                p.x + p.width - margin > obs.x + margin &&
+                p.y + margin < obs.y + obs.height - margin &&
+                p.y + p.height - margin > obs.y + margin
+            );
+        }
+
+        // プレイヤーとコインの当たり判定
+        function checkCoinCollection(p, c) {
+            const pCenterX = p.x + p.width / 2;
+            const pCenterY = p.y + p.height / 2;
+            const distX = Math.abs(c.x - pCenterX);
+            const distY = Math.abs(c.y - pCenterY);
+            return (distX <= (p.width / 2 + c.radius - 2) && distY <= (p.height / 2 + c.radius - 2));
+        }
+
+        // 毎フレームの計算
+        function update() {
+            if (isGameOver) return; // ゲームオーバー中は計算を止める
+
+            // スコア加算（1秒に+1：約60fpsで60フレームごとに1加算）
+            scoreTicks++;
+            if (scoreTicks >= 60) {
+                score++;
+                scoreTicks = 0;
+                checkAndUpdateHighScore(); // リアルタイムでハイスコア自動保存
+            }
+
+            // スコアに応じて障害物スピードを徐々にアップ (10秒生存ごとに0.5アップ、最高12まで)
+            gameSpeed = baseSpeed + Math.min(7, Math.floor(score / 10) * 0.5);
+
+            // ステージ進行の監視（30点ごとに次のステージへ遷移）
+            const newStage = Math.floor(score / 30);
+            if (newStage !== currentStageIndex) {
+                showStageBanner(newStage);
+            }
+
+            // ステージバナーのアニメーション更新
+            if (stageBanner.timer > 0) {
+                stageBanner.timer--;
+                if (stageBanner.timer < 30) {
+                    stageBanner.alpha = stageBanner.timer / 30;
+                } else if (stageBanner.timer > 130) {
+                    stageBanner.alpha = (150 - stageBanner.timer) / 20;
+                } else {
+                    stageBanner.alpha = 1.0;
+                }
+            } else {
+                stageBanner.alpha = 0;
+            }
+
+            // 背景演出の更新（芝生スクロール、星のきらめき、雲の流れ、ネコの歩行）
+            groundOffset = (groundOffset + gameSpeed) % 15;
+
+            // 星のきらめきとゆっくりスクロール
+            for (let star of bgStars) {
+                star.x -= gameSpeed * 0.08;
+                if (star.x < 0) star.x += canvas.width;
+                star.twinkle += 0.06;
+            }
+
+            // 宇宙空間ステージ（SPACE: 90〜119点、および210〜239点...）での流れ星生成・更新
+            const currentThemeType = STAGE_THEMES[currentStageIndex % 4].type;
+            if (currentThemeType === "space" || (currentThemeType === "night" && (score % 30) >= 22)) {
+                if (Math.random() < 0.025 && shootingStars.length < 2) {
+                    shootingStars.push({
+                        x: Math.random() * 320 + 200,
+                        y: Math.random() * 70 + 10,
+                        vx: -6.5,
+                        vy: 3.2,
+                        length: 32,
+                        alpha: 1.0
+                    });
+                }
+            }
+            for (let i = shootingStars.length - 1; i >= 0; i--) {
+                const ss = shootingStars[i];
+                ss.x += ss.vx;
+                ss.y += ss.vy;
+                ss.alpha -= 0.022;
+                if (ss.alpha <= 0 || ss.x < 0 || ss.y > groundY) {
+                    shootingStars.splice(i, 1);
+                }
+            }
+
+            // 雲のスクロール（パララックス効果）
+            for (let cloud of bgClouds) {
+                cloud.x -= gameSpeed * 0.25;
+                if (cloud.x < -60) cloud.x = canvas.width + 50;
+            }
+
+            // 歩行・しっぽアニメーションの進行
+            if (player.isGrounded) {
+                runAnimTick += 0.28;
+            } else {
+                runAnimTick += 0.08;
+            }
+
+            // 1. プレイヤーの移動と回転アニメーション
+            player.vy += gravity;
+            player.y += player.vy;
+
+            // 2段ジャンプ時のクルッとスピン演出
+            if (player.isSpinning) {
+                player.rotation += 0.35;
+                if (player.rotation >= Math.PI * 2) {
+                    player.rotation = 0;
+                    player.isSpinning = false;
+                }
+            } else {
+                player.rotation = 0;
+            }
+
+            // 着地判定（ジャンプ回数と回転をリセット）
+            if (player.y >= groundY - player.height) {
+                player.y = groundY - player.height;
+                player.vy = 0;
+                player.isGrounded = true;
+                player.jumpCount = 0;
+                player.isSpinning = false;
+                player.rotation = 0;
+            }
+
+            // 2. 障害物の出現制御
+            spawnTimer++;
+            if (spawnTimer >= nextSpawnInterval) {
+                spawnObstacle();
+                spawnTimer = 0;
+                const speedFactor = baseSpeed / gameSpeed;
+                nextSpawnInterval = Math.floor((Math.random() * 45 + 55) * speedFactor);
+            }
+
+            // 3. コイン（黄金のお魚）の出現制御
+            coinSpawnTimer++;
+            if (coinSpawnTimer >= nextCoinInterval) {
+                spawnCoin();
+                coinSpawnTimer = 0;
+                nextCoinInterval = Math.floor(Math.random() * 110 + 100);
+            }
+
+            // 4. コインの移動・当たり判定
+            for (let i = coins.length - 1; i >= 0; i--) {
+                const coin = coins[i];
+                coin.x -= gameSpeed;
+                coin.angle += 0.08;
+                coin.y = coin.baseY + Math.sin(coin.angle) * 5; // 上下にふわふわ浮遊
+
+                // 獲得判定
+                if (checkCoinCollection(player, coin)) {
+                    score += 5;
+                    checkAndUpdateHighScore(); // コイン獲得時も即座にハイスコア自動保存
+                    playCoinSound();
+                    floatingTexts.push({
+                        x: coin.x,
+                        y: coin.y,
+                        text: "+5",
+                        alpha: 1.0
+                    });
+                    coins.splice(i, 1);
+                    continue;
+                }
+
+                // 画面外で消去
+                if (coin.x + coin.radius < 0) {
+                    coins.splice(i, 1);
+                }
+            }
+
+            // 5. ポップアップテキストの更新
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y -= 1.2;
+                ft.alpha -= 0.025;
+                if (ft.alpha <= 0) {
+                    floatingTexts.splice(i, 1);
+                }
+            }
+
+            // 6. 障害物の移動・当たり判定
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                const obs = obstacles[i];
+                obs.x -= gameSpeed;
+
+                // 飛行敵（カラス）の翼アニメーション
+                if (obs.type === "flying") {
+                    obs.wingAngle = (obs.wingAngle || 0) + 0.22;
+                }
+
+                // 当たり判定チェック
+                if (checkCollision(player, obs)) {
+                    isGameOver = true;
+                    playGameOverSound();
+
+                    // ハイスコア更新判定と保存
+                    checkAndUpdateHighScore();
+
+                    // ゲームオーバー画面にスコアを表示
+                    finalScoreVal.textContent = score;
+                    finalBestVal.textContent = highScore;
+                    gameOverScreen.style.display = "flex";
+                }
+
+                // 画面外に出たら削除
+                if (obs.x + obs.width < 0) {
+                    obstacles.splice(i, 1);
+                }
+            }
+        }
+
+        // --- 描画処理 ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // スコアに基づくステージ・テーマ計算と滑らかなカラーブレンド
+            const stageIdx = Math.floor(score / 30);
+            const themeIdx = stageIdx % 4;
+            const nextThemeIdx = (stageIdx + 1) % 4;
+            const currTheme = STAGE_THEMES[themeIdx];
+            const nextTheme = STAGE_THEMES[nextThemeIdx];
+
+            // 各ステージの後半（22点〜30点）にかけて次の景色の色へ滑らかにブレンド
+            const rem = score % 30;
+            let blendT = 0;
+            if (rem >= 22) {
+                blendT = (rem - 22 + (scoreTicks / 60)) / 8;
+                blendT = Math.min(1, Math.max(0, blendT));
+            }
+
+            const curSkyTop = lerpColor(currTheme.skyTop, nextTheme.skyTop, blendT);
+            const curSkyBottom = lerpColor(currTheme.skyBottom, nextTheme.skyBottom, blendT);
+            const curGrassTop = lerpColor(currTheme.grassTop, nextTheme.grassTop, blendT);
+            const curGrassBottom = lerpColor(currTheme.grassBottom, nextTheme.grassBottom, blendT);
+            const curStarAlpha = lerp(currTheme.starAlpha, nextTheme.starAlpha, blendT);
+            const curCloudAlpha = lerp(currTheme.cloudAlpha, nextTheme.cloudAlpha, blendT);
+
+            // 1. 滑らかに変化する空のグラデーション背景
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
+            skyGrad.addColorStop(0, `rgb(${curSkyTop[0]}, ${curSkyTop[1]}, ${curSkyTop[2]})`);
+            skyGrad.addColorStop(1, `rgb(${curSkyBottom[0]}, ${curSkyBottom[1]}, ${curSkyBottom[2]})`);
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, canvas.width, groundY);
+
+            // 2. 天体（太陽 / 夕日 / 月 / 星雲）の演出
+            // 昼間の太陽
+            if (themeIdx === 0 && blendT < 0.8) {
+                const sunAlpha = 1 - blendT;
+                ctx.save();
+                ctx.fillStyle = `rgba(253, 224, 71, ${sunAlpha * 0.3})`;
+                ctx.beginPath();
+                ctx.arc(480, 52, 28, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = `rgba(250, 204, 21, ${sunAlpha})`;
+                ctx.beginPath();
+                ctx.arc(480, 52, 17, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            // 夕暮れの夕日
+            if ((themeIdx === 1 && blendT < 0.8) || (themeIdx === 0 && blendT >= 0.2)) {
+                const sunsetAlpha = themeIdx === 1 ? (1 - blendT) : blendT;
+                ctx.save();
+                ctx.fillStyle = `rgba(251, 146, 60, ${sunsetAlpha * 0.4})`;
+                ctx.beginPath();
+                ctx.arc(400, 125, 34, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = `rgba(249, 115, 22, ${sunsetAlpha * 0.9})`;
+                ctx.beginPath();
+                ctx.arc(400, 125, 20, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            // 夜の三日月
+            if ((themeIdx === 2 && blendT < 0.8) || (themeIdx === 1 && blendT >= 0.3)) {
+                const moonAlpha = themeIdx === 2 ? (1 - blendT) : blendT;
+                ctx.save();
+                ctx.fillStyle = `rgba(254, 240, 138, ${moonAlpha})`;
+                ctx.beginPath();
+                ctx.arc(495, 50, 14, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = `rgb(${curSkyTop[0]}, ${curSkyTop[1]}, ${curSkyTop[2]})`;
+                ctx.beginPath();
+                ctx.arc(490, 48, 12, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            // 宇宙の星雲ネビュラ
+            if ((themeIdx === 3) || (themeIdx === 2 && blendT >= 0.2)) {
+                const spaceAlpha = themeIdx === 3 ? (1 - blendT * 0.5) : blendT;
+                ctx.save();
+                const nebGrad = ctx.createRadialGradient(280, 80, 10, 280, 80, 140);
+                nebGrad.addColorStop(0, `rgba(168, 85, 247, ${spaceAlpha * 0.35})`);
+                nebGrad.addColorStop(0.5, `rgba(59, 130, 246, ${spaceAlpha * 0.2})`);
+                nebGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+                ctx.fillStyle = nebGrad;
+                ctx.fillRect(100, 0, 360, groundY);
+                ctx.restore();
+            }
+
+            // 3. 星々の描画（夜・宇宙で輝く）
+            if (curStarAlpha > 0.05) {
+                for (let star of bgStars) {
+                    const alpha = curStarAlpha * (0.35 + Math.sin(star.twinkle) * 0.35);
+                    if (themeIdx === 3) {
+                        ctx.fillStyle = (star.x % 3 === 0) ? `rgba(147, 197, 253, ${alpha})` : (star.x % 3 === 1 ? `rgba(244, 114, 182, ${alpha})` : `rgba(253, 224, 71, ${alpha})`);
+                    } else {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    }
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // 4. 流れ星の描画（宇宙空間）
+            for (let ss of shootingStars) {
+                ctx.save();
+                const tailX = ss.x - ss.vx * (ss.length / 7);
+                const tailY = ss.y - ss.vy * (ss.length / 7);
+                const starGrad = ctx.createLinearGradient(tailX, tailY, ss.x, ss.y);
+                starGrad.addColorStop(0, "rgba(255, 255, 255, 0)");
+                starGrad.addColorStop(1, `rgba(254, 240, 138, ${ss.alpha})`);
+                ctx.strokeStyle = starGrad;
+                ctx.lineWidth = 2.2;
+                ctx.lineCap = "round";
+                ctx.beginPath();
+                ctx.moveTo(tailX, tailY);
+                ctx.lineTo(ss.x, ss.y);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 5. 雲の描画（昼はふんわり白、夕方は茜色）
+            if (curCloudAlpha > 0.05) {
+                for (let cloud of bgClouds) {
+                    ctx.save();
+                    ctx.translate(cloud.x, cloud.y);
+                    ctx.scale(cloud.scale, cloud.scale);
+                    if (themeIdx === 1) {
+                        ctx.fillStyle = `rgba(254, 215, 170, ${curCloudAlpha * 0.6})`;
+                    } else {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${curCloudAlpha * 0.5})`;
+                    }
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+                    ctx.arc(14, -6, 13, 0, Math.PI * 2);
+                    ctx.arc(28, 0, 15, 0, Math.PI * 2);
+                    ctx.arc(14, 5, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            // 6. 地面（緑の芝生・スコアに合わせて自然に色変化）
+            const grassGrad = ctx.createLinearGradient(0, groundY, 0, canvas.height);
+            grassGrad.addColorStop(0, `rgb(${curGrassTop[0]}, ${curGrassTop[1]}, ${curGrassTop[2]})`);
+            grassGrad.addColorStop(0.25, `rgb(${Math.max(0, curGrassTop[0] - 15)}, ${Math.max(0, curGrassTop[1] - 15)}, ${Math.max(0, curGrassTop[2] - 15)})`);
+            grassGrad.addColorStop(1, `rgb(${curGrassBottom[0]}, ${curGrassBottom[1]}, ${curGrassBottom[2]})`);
+            ctx.fillStyle = grassGrad;
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+
+            // 芝生のトゲトゲパターン（走るスピードに合わせて左へスクロール）
+            ctx.fillStyle = currTheme.grassStripe || "#34d399";
+            ctx.beginPath();
+            for (let x = -20; x < canvas.width + 25; x += 15) {
+                const gx = x - groundOffset;
+                ctx.moveTo(gx, groundY);
+                ctx.lineTo(gx + 7.5, groundY - 5);
+                ctx.lineTo(gx + 15, groundY);
+            }
+            ctx.fill();
+
+            // 地面の区切りライン
+            ctx.strokeStyle = `rgb(${curGrassBottom[0]}, ${curGrassBottom[1]}, ${curGrassBottom[2]})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.stroke();
+
+            // 5. ボーナスアイテム（キラキラ輝く黄金のお魚）
+            for (let coin of coins) {
+                ctx.save();
+                // 外側のゴールドグロー
+                ctx.beginPath();
+                ctx.arc(coin.x, coin.y, coin.radius + 4, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(251, 191, 36, 0.25)";
+                ctx.fill();
+
+                // 魚の尾びれ
+                ctx.fillStyle = "#f59e0b";
+                ctx.beginPath();
+                ctx.moveTo(coin.x + 8, coin.y);
+                ctx.lineTo(coin.x + 15, coin.y - 6);
+                ctx.lineTo(coin.x + 13, coin.y);
+                ctx.lineTo(coin.x + 15, coin.y + 6);
+                ctx.closePath();
+                ctx.fill();
+
+                // 魚の胴体（黄金の楕円）
+                ctx.fillStyle = "#fbbf24";
+                ctx.beginPath();
+                ctx.ellipse(coin.x - 1, coin.y, 10, 6.5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 魚のお腹の明るいハイライト
+                ctx.fillStyle = "#fef08a";
+                ctx.beginPath();
+                ctx.ellipse(coin.x - 2, coin.y + 1.5, 6, 3, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 魚の黒目
+                ctx.fillStyle = "#1e293b";
+                ctx.beginPath();
+                ctx.arc(coin.x - 6, coin.y - 1.5, 1.4, 0, Math.PI * 2);
+                ctx.fill();
+                // 白いハイライト
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(coin.x - 6.5, coin.y - 2, 0.6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // キラキラスパークル（十字星）
+                const sparklePhase = (coin.angle * 2) % (Math.PI * 2);
+                if (Math.sin(sparklePhase) > 0.3) {
+                    ctx.fillStyle = "#ffffff";
+                    const sx = coin.x + 2;
+                    const sy = coin.y - 8;
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy - 3);
+                    ctx.lineTo(sx + 1, sy - 1);
+                    ctx.lineTo(sx + 3, sy);
+                    ctx.lineTo(sx + 1, sy + 1);
+                    ctx.lineTo(sx, sy + 3);
+                    ctx.lineTo(sx - 1, sy + 1);
+                    ctx.lineTo(sx - 3, sy);
+                    ctx.lineTo(sx - 1, sy - 1);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // 6. プレイヤー（可愛い黒ネコ）
+            ctx.save();
+            // 原点をプレイヤー中心に移動（2段ジャンプの回転に対応）
+            ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
+            ctx.rotate(player.rotation);
+
+            // アニメーション計算
+            const legSwing = player.isGrounded ? Math.sin(runAnimTick) * 6 : -3;
+            const tailWiggle = Math.sin(runAnimTick * 0.8) * 6;
+
+            // しっぽ（ゆらゆら揺れる）
+            ctx.strokeStyle = "#111827";
+            ctx.lineWidth = 3.8;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(-11, 4);
+            ctx.quadraticCurveTo(-22, -2 + tailWiggle, -18 + tailWiggle * 0.4, -14);
+            ctx.stroke();
+
+            // 足（走るパタパタアニメーション）
+            // 後ろ足
+            ctx.fillStyle = "#1f2937";
+            ctx.fillRect(-11 - legSwing * 0.6, 6, 5, 11);
+            // 前足
+            ctx.fillRect(4 + legSwing * 0.6, 6, 5, 11);
+            // 白い靴下（足先の白いソックス）
+            ctx.fillStyle = "#f8fafc";
+            ctx.fillRect(-11 - legSwing * 0.6, 13, 5, 4);
+            ctx.fillRect(4 + legSwing * 0.6, 13, 5, 4);
+
+            // ネコの胴体
+            ctx.fillStyle = "#111827";
+            ctx.beginPath();
+            ctx.ellipse(-2, 3, 13, 9.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ネコの丸い頭
+            ctx.beginPath();
+            ctx.ellipse(6, -6, 10.5, 9.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 三角の耳（黒＋ピンクの内側）
+            // 左耳
+            ctx.fillStyle = "#111827";
+            ctx.beginPath();
+            ctx.moveTo(1, -12);
+            ctx.lineTo(4, -20);
+            ctx.lineTo(8, -12);
+            ctx.fill();
+            ctx.fillStyle = "#f472b6";
+            ctx.beginPath();
+            ctx.moveTo(2.5, -12);
+            ctx.lineTo(4.2, -18);
+            ctx.lineTo(6.8, -12);
+            ctx.fill();
+
+            // 右耳
+            ctx.fillStyle = "#111827";
+            ctx.beginPath();
+            ctx.moveTo(8, -12);
+            ctx.lineTo(12, -20);
+            ctx.lineTo(15, -12);
+            ctx.fill();
+            ctx.fillStyle = "#f472b6";
+            ctx.beginPath();
+            ctx.moveTo(9.2, -12);
+            ctx.lineTo(12, -18);
+            ctx.lineTo(14, -12);
+            ctx.fill();
+
+            // 赤い首輪と黄金の鈴
+            ctx.strokeStyle = "#ef4444";
+            ctx.lineWidth = 2.4;
+            ctx.beginPath();
+            ctx.arc(4, 1, 6.2, 0.25, Math.PI - 0.25);
+            ctx.stroke();
+            // 鈴
+            ctx.fillStyle = "#fbbf24";
+            ctx.beginPath();
+            ctx.arc(4, 7.2, 2.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#92400e";
+            ctx.beginPath();
+            ctx.arc(4, 7.8, 0.7, 0, Math.PI * 2);
+            ctx.fill();
+
+            // お顔（愛らしい黄色い瞳、縦長瞳孔、ハイライト、ピンクの鼻、白いひげ）
+            // 黄色いお目々
+            ctx.fillStyle = "#fbbf24";
+            ctx.beginPath();
+            ctx.ellipse(10.5, -7, 3.2, 4.2, 0.1, 0, Math.PI * 2);
+            ctx.fill();
+            // 縦長の黒い瞳孔
+            ctx.fillStyle = "#111827";
+            ctx.beginPath();
+            ctx.ellipse(11, -7, 1.2, 3.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            // ハイライト白丸
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(10, -8.3, 1.1, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ピンクの小さな鼻
+            ctx.fillStyle = "#f472b6";
+            ctx.beginPath();
+            ctx.moveTo(14, -4);
+            ctx.lineTo(16, -5);
+            ctx.lineTo(16, -3);
+            ctx.fill();
+
+            // 白いひげ
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(12, -3);
+            ctx.lineTo(19, -4.5);
+            ctx.moveTo(12, -1);
+            ctx.lineTo(19, 0.5);
+            ctx.stroke();
+
+            ctx.restore();
+
+            // 7. 障害物の描画（可愛いサボテン & パタパタ飛ぶカラス）
+            for (let obs of obstacles) {
+                if (obs.type === "flying") {
+                    // --- 空を飛ぶカラス ---
+                    ctx.save();
+                    const floatY = Math.sin((obs.wingAngle || 0) * 0.7) * 3;
+                    const crowX = obs.x;
+                    const crowY = obs.y + floatY;
+
+                    // カラスの胴体（濃いネイビーブラック）
+                    ctx.fillStyle = "#1e293b";
+                    ctx.beginPath();
+                    ctx.ellipse(crowX + 18, crowY + 10, 11, 7, -0.1, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // カラスの頭
+                    ctx.fillStyle = "#0f172a";
+                    ctx.beginPath();
+                    ctx.arc(crowX + 9, crowY + 7, 6.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 黄色いくちばし
+                    ctx.fillStyle = "#f59e0b";
+                    ctx.beginPath();
+                    ctx.moveTo(crowX + 5, crowY + 5);
+                    ctx.lineTo(crowX - 3, crowY + 7.5);
+                    ctx.lineTo(crowX + 5, crowY + 10);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // つぶらな白目と黒目
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath();
+                    ctx.arc(crowX + 8, crowY + 6, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = "#0f172a";
+                    ctx.beginPath();
+                    ctx.arc(crowX + 7.5, crowY + 6, 1, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // パタパタ羽ばたく翼
+                    const wingOffset = Math.sin(obs.wingAngle || 0) * 8;
+                    ctx.fillStyle = "#334155";
+                    ctx.beginPath();
+                    ctx.moveTo(crowX + 13, crowY + 8);
+                    ctx.lineTo(crowX + 21, crowY - 2 + wingOffset);
+                    ctx.lineTo(crowX + 26, crowY + 8);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 尾羽
+                    ctx.fillStyle = "#0f172a";
+                    ctx.beginPath();
+                    ctx.moveTo(crowX + 27, crowY + 9);
+                    ctx.lineTo(crowX + 33, crowY + 12);
+                    ctx.lineTo(crowX + 27, crowY + 13);
+                    ctx.fill();
+
+                    ctx.restore();
+                } else {
+                    // --- 地面の可愛いサボテン ---
+                    ctx.save();
+                    const cx = obs.x;
+                    const cy = obs.y;
+                    const cw = obs.width;
+                    const ch = obs.height;
+
+                    // メインの幹（エメラルドグリーン）
+                    const mainW = 14;
+                    const mainX = cx + (cw - mainW) / 2;
+
+                    // 幹の描画
+                    ctx.fillStyle = "#10b981";
+                    ctx.beginPath();
+                    ctx.arc(mainX + mainW / 2, cy + mainW / 2, mainW / 2, Math.PI, 0);
+                    ctx.lineTo(mainX + mainW, cy + ch);
+                    ctx.lineTo(mainX, cy + ch);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 幹の影（立体感）
+                    ctx.fillStyle = "#059669";
+                    ctx.beginPath();
+                    ctx.arc(mainX + mainW / 2, cy + mainW / 2, mainW / 2, Math.PI, Math.PI * 1.5);
+                    ctx.lineTo(mainX + mainW / 2, cy + ch);
+                    ctx.lineTo(mainX, cy + ch);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 左の腕（枝）
+                    ctx.fillStyle = "#10b981";
+                    ctx.beginPath();
+                    ctx.arc(cx + 3, cy + ch * 0.45, 3.5, Math.PI, 0);
+                    ctx.lineTo(cx + 6.5, cy + ch * 0.65);
+                    ctx.lineTo(mainX, cy + ch * 0.65);
+                    ctx.lineTo(mainX, cy + ch * 0.55);
+                    ctx.lineTo(cx, cy + ch * 0.55);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 右の腕（枝）
+                    ctx.beginPath();
+                    ctx.arc(cx + cw - 3, cy + ch * 0.35, 3.5, Math.PI, 0);
+                    ctx.lineTo(cx + cw, cy + ch * 0.55);
+                    ctx.lineTo(mainX + mainW, cy + ch * 0.55);
+                    ctx.lineTo(mainX + mainW, cy + ch * 0.45);
+                    ctx.lineTo(cx + cw - 6.5, cy + ch * 0.45);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 可愛い小さなトゲ（白・黄色）
+                    ctx.fillStyle = "#fef08a";
+                    const spineY = [cy + ch * 0.3, cy + ch * 0.5, cy + ch * 0.75];
+                    for (let sy of spineY) {
+                        ctx.fillRect(mainX + 3, sy, 2, 2);
+                        ctx.fillRect(mainX + mainW - 5, sy + 4, 2, 2);
+                    }
+
+                    // てっぺんのピンクのお花
+                    const flowerX = mainX + mainW / 2;
+                    const flowerY = cy + 1;
+                    ctx.fillStyle = "#f43f5e";
+                    ctx.beginPath();
+                    ctx.arc(flowerX - 2, flowerY, 2.5, 0, Math.PI * 2);
+                    ctx.arc(flowerX + 2, flowerY, 2.5, 0, Math.PI * 2);
+                    ctx.arc(flowerX, flowerY - 2, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = "#fbbf24";
+                    ctx.beginPath();
+                    ctx.arc(flowerX, flowerY, 1.2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.restore();
+                }
+            }
+
+            // 8. ポップアップテキスト（+5）の描画
+            for (let ft of floatingTexts) {
+                ctx.save();
+                ctx.font = "bold 16px 'Segoe UI', sans-serif";
+                ctx.fillStyle = `rgba(251, 191, 36, ${ft.alpha})`;
+                ctx.textAlign = "center";
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            }
+
+            // 9. 画面右上のスコア・ハイスコア表示（自動保存されている最新ハイスコア）
+            const t = i18n[currentLang];
+            ctx.save();
+            ctx.font = "bold 15px 'Segoe UI', monospace, sans-serif";
+            ctx.textAlign = "right";
+            ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+            ctx.shadowBlur = 4;
+
+            // スコア表示
+            ctx.fillStyle = "#fbbf24";
+            ctx.fillText(`${t.scoreLabel}: ${score}`, canvas.width - 20, 30);
+
+            // ハイスコア表示（localStorage から常に最新値）
+            ctx.fillStyle = "#e2e8f0";
+            ctx.fillText(`${t.bestLabel}: ${highScore}`, canvas.width - 20, 52);
+            ctx.restore();
+
+            // 10. 画面上部のステージ通知バナー演出（STAGE 2: SUNSET, STAGE 3: NIGHT...）
+            if (stageBanner.alpha > 0) {
+                ctx.save();
+                ctx.font = "bold 15px 'Segoe UI', sans-serif";
+                const textWidth = ctx.measureText(stageBanner.text).width;
+                const px = canvas.width / 2;
+                const py = 36;
+
+                // バナー背景ピル
+                ctx.fillStyle = `rgba(15, 23, 42, ${stageBanner.alpha * 0.88})`;
+                ctx.strokeStyle = `rgba(251, 191, 36, ${stageBanner.alpha * 0.95})`;
+                ctx.beginPath();
+                drawRoundRect(ctx, px - textWidth / 2 - 16, py - 14, textWidth + 32, 28, 14);
+                ctx.fill();
+                ctx.stroke();
+
+                // テキスト
+                ctx.fillStyle = `rgba(254, 240, 138, ${stageBanner.alpha})`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(stageBanner.text, px, py);
+                ctx.restore();
+            }
+
+            // 11. 画面上部中央の現在ステージ表記（控えめな常時インジケーター）
+            ctx.save();
+            ctx.font = "bold 12px 'Segoe UI', sans-serif";
+            ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
+            ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
+            ctx.shadowBlur = 3;
+            ctx.textAlign = "center";
+            ctx.fillText(getStageTitle(stageIdx, currentLang), canvas.width / 2, 16);
+            ctx.restore();
+        }
+
+        // メインループ
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+
+</body>
+
+</html>
