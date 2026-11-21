@@ -1439,15 +1439,6 @@
                 ctx.restore();
             }
 
-            // 11. 画面上部中央の現在ステージ表記（控えめな常時インジケーター）
-            ctx.save();
-            ctx.font = "bold 12px 'Segoe UI', sans-serif";
-            ctx.fillStyle = "rgba(255, 255, 255, 0.75)";
-            ctx.shadowColor = "rgba(0, 0, 0, 0.6)";
-            ctx.shadowBlur = 3;
-            ctx.textAlign = "center";
-            ctx.fillText(getStageTitle(stageIdx, currentLang), canvas.width / 2, 16);
-            ctx.restore();
         }
 
         // メインループ
