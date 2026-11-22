@@ -286,7 +286,7 @@
         const browserLang = (navigator.language || navigator.userLanguage || "").toLowerCase();
         let currentLang = browserLang.startsWith("ja") ? "ja" : "en";
 
-        // --- 無限ループする景色の変化（ステージ演出）の定義 ---
+        // --- ステージごとの景色の定義 ---
         const STAGE_THEMES = [
             // 0: DAY (爽やかな昼間の青空)
             {
@@ -304,7 +304,7 @@
             // 1: SUNSET (綺麗な夕暮れ・オレンジ〜紫)
             {
                 name: "SUNSET",
-                nameJa: "夕暮れ (SUNSET)",
+                nameJa: "夕暮れ",
                 skyTop: [67, 56, 202],      // #4338ca
                 skyBottom: [249, 115, 22],  // #f97316
                 grassTop: [16, 185, 129],   // #10b981
@@ -317,7 +317,7 @@
             // 2: NIGHT (満天の星空)
             {
                 name: "NIGHT",
-                nameJa: "星空 (NIGHT)",
+                nameJa: "夜空",
                 skyTop: [11, 15, 25],       // #0b0f19
                 skyBottom: [59, 30, 84],    // #3b1e54
                 grassTop: [5, 150, 105],    // #059669
@@ -330,7 +330,7 @@
             // 3: SPACE (神秘的な宇宙空間・星雲や流れ星)
             {
                 name: "SPACE",
-                nameJa: "宇宙 (SPACE)",
+                nameJa: "宇宙",
                 skyTop: [2, 6, 23],         // #020617
                 skyBottom: [88, 28, 135],   // #581c87
                 grassTop: [13, 148, 136],   // #0d9488
@@ -339,8 +339,86 @@
                 starAlpha: 1.0,
                 cloudAlpha: 0.35,
                 type: "space"
+            },
+            {
+                name: "AURORA SKY",
+                nameJa: "オーロラの夜空",
+                skyTop: [8, 19, 49],
+                skyBottom: [24, 63, 78],
+                grassTop: [20, 94, 83],
+                grassBottom: [5, 55, 51],
+                grassStripe: "#34d399",
+                starAlpha: 0.9,
+                cloudAlpha: 0,
+                type: "aurora"
+            },
+            {
+                name: "SWEETS WORLD",
+                nameJa: "お菓子の国",
+                skyTop: [255, 182, 205],
+                skyBottom: [255, 243, 210],
+                grassTop: [244, 114, 182],
+                grassBottom: [126, 34, 206],
+                grassStripe: "#fbcfe8",
+                starAlpha: 0.25,
+                cloudAlpha: 0,
+                type: "sweets"
+            },
+            {
+                name: "DEEP SEA",
+                nameJa: "不思議な深海",
+                skyTop: [3, 30, 74],
+                skyBottom: [16, 135, 174],
+                grassTop: [14, 116, 144],
+                grassBottom: [8, 47, 73],
+                grassStripe: "#67e8f9",
+                starAlpha: 0.2,
+                cloudAlpha: 0,
+                type: "deepSea"
+            },
+            {
+                name: "CAT PARADISE",
+                nameJa: "黄金のネコ神殿",
+                skyTop: [251, 191, 36],
+                skyBottom: [255, 228, 235],
+                grassTop: [217, 119, 6],
+                grassBottom: [124, 45, 18],
+                grassStripe: "#fde68a",
+                starAlpha: 0.75,
+                cloudAlpha: 0,
+                type: "temple"
+            },
+            {
+                name: "RAINBOW SKY",
+                nameJa: "虹の架け橋",
+                skyTop: [119, 130, 194],
+                skyBottom: [255, 232, 224],
+                grassTop: [96, 165, 250],
+                grassBottom: [59, 130, 246],
+                grassStripe: "#bfdbfe",
+                starAlpha: 0.3,
+                cloudAlpha: 0.9,
+                type: "rainbow"
+            },
+            {
+                name: "GALAXY END",
+                nameJa: "銀河の果て",
+                skyTop: [12, 5, 32],
+                skyBottom: [35, 12, 73],
+                grassTop: [76, 29, 149],
+                grassBottom: [30, 27, 75],
+                grassStripe: "#a78bfa",
+                starAlpha: 1,
+                cloudAlpha: 0,
+                type: "galaxy"
             }
         ];
+
+        const LAST_STAGE_INDEX = STAGE_THEMES.length - 1;
+
+        function getStageIndex(scoreValue) {
+            return Math.min(Math.floor(scoreValue / 30), LAST_STAGE_INDEX);
+        }
 
         function lerp(a, b, t) {
             return a + (b - a) * t;
@@ -355,21 +433,13 @@
         }
 
         function getStageTitle(stageIdx, lang) {
-            const stageNum = stageIdx + 1;
-            const themeIdx = stageIdx % 4;
-            const isLoop = stageIdx >= 4;
-            const t = STAGE_THEMES[themeIdx];
-
-            let titleName = t.name;
-            if (isLoop && themeIdx === 0) {
-                titleName = "NEW DAY";
-            }
-
+            const safeStageIdx = Math.min(stageIdx, LAST_STAGE_INDEX);
+            const stageNum = safeStageIdx + 1;
+            const t = STAGE_THEMES[safeStageIdx];
             if (lang === "ja") {
-                const jaName = (isLoop && themeIdx === 0) ? "新しい朝 (NEW DAY)" : t.nameJa;
-                return `STAGE ${stageNum}: ${jaName}`;
+                return `STAGE ${stageNum}: ${t.nameJa}`;
             } else {
-                return `STAGE ${stageNum}: ${titleName}`;
+                return `STAGE ${stageNum}: ${t.name}`;
             }
         }
 
@@ -385,7 +455,7 @@
             currentStageIndex = stageIdx;
             stageBanner.stageIdx = stageIdx;
             stageBanner.text = getStageTitle(stageIdx, currentLang);
-            stageBanner.timer = 150; // 約2.5秒表示
+            stageBanner.timer = 90;
             stageBanner.alpha = 1.0;
         }
 
@@ -627,7 +697,7 @@
         let coins = [];
         let floatingTexts = []; // +5 ポップアップ演出用
         const baseSpeed = 5;
-        let gameSpeed = baseSpeed;
+        const gameSpeed = baseSpeed;
         let spawnTimer = 0;
         let nextSpawnInterval = 90;
         let coinSpawnTimer = 0;
@@ -650,6 +720,40 @@
             { x: 440, y: 40, scale: 0.95 },
             { x: 610, y: 70, scale: 0.85 }
         ];
+
+        let environmentTick = 0;
+
+        function createBackgroundParticles(count, minY, maxY, minSize, maxSize) {
+            return Array.from({ length: count }, () => {
+                const x = Math.random() * canvas.width;
+                const y = minY + Math.random() * (maxY - minY);
+                return {
+                    x,
+                    baseX: x,
+                    y,
+                    baseY: y,
+                    size: minSize + Math.random() * (maxSize - minSize),
+                    phase: Math.random() * Math.PI * 2,
+                    speed: 0.25 + Math.random() * 0.65
+                };
+            });
+        }
+
+        const auroraSparkles = createBackgroundParticles(24, 12, groundY - 30, 0.8, 2);
+        const candyDecorations = createBackgroundParticles(13, 30, groundY - 45, 7, 13);
+        const seaBubbles = createBackgroundParticles(22, 20, groundY - 10, 2, 8);
+        const templeParticles = createBackgroundParticles(36, 8, groundY - 20, 1, 3.5);
+        const rainbowSparkles = Array.from({ length: 48 }, () => {
+            const band = Math.floor(Math.random() * 6);
+            return {
+                angle: Math.PI + Math.random() * Math.PI,
+                radiusX: 270 - band * 17 + Math.random() * 10 - 5,
+                radiusY: 200 - band * 17 + Math.random() * 10 - 5,
+                size: 0.8 + Math.random() * 2.4,
+                phase: Math.random() * Math.PI * 2
+            };
+        });
+        const galaxyStarfield = createBackgroundParticles(90, 8, groundY - 35, 0.6, 2.2);
 
         let groundOffset = 0;
         let runAnimTick = 0;
@@ -770,7 +874,6 @@
             runAnimTick = 0;
             score = 0;
             scoreTicks = 0;
-            gameSpeed = baseSpeed;
             showStageBanner(0);
             player.y = groundY - player.height;
             player.vy = 0;
@@ -891,6 +994,32 @@
 
         // 毎フレームの計算
         function update() {
+            environmentTick++;
+            for (const candy of candyDecorations) {
+                candy.x -= gameSpeed * 0.12;
+                candy.y = candy.baseY + Math.sin(environmentTick * 0.025 + candy.phase) * 5;
+                if (candy.x < -candy.size * 2) candy.x = canvas.width + candy.size * 2;
+            }
+            for (const bubble of seaBubbles) {
+                bubble.y -= bubble.speed;
+                bubble.x = bubble.baseX + Math.sin(environmentTick * 0.015 + bubble.phase) * 3;
+                if (bubble.y < -bubble.size * 2) {
+                    bubble.y = groundY + bubble.size;
+                    bubble.baseX = Math.random() * canvas.width;
+                }
+            }
+            for (const particle of templeParticles) {
+                particle.x -= gameSpeed * 0.08;
+                particle.y = particle.baseY + Math.sin(environmentTick * 0.035 + particle.phase) * 7;
+                if (particle.x < -particle.size * 2) particle.x = canvas.width + particle.size * 2;
+            }
+            for (const sparkle of rainbowSparkles) {
+                const angle = sparkle.angle + Math.sin(environmentTick * 0.025 + sparkle.phase) * 0.025;
+                sparkle.x = canvas.width / 2 + Math.cos(angle) * sparkle.radiusX;
+                sparkle.y = 220 + Math.sin(angle) * sparkle.radiusY +
+                    Math.sin(environmentTick * 0.04 + sparkle.phase) * 2;
+            }
+
             if (gameState === GAME_STATE.TITLE) {
                 if (player.isGrounded) {
                     runAnimTick += 0.08;
@@ -907,11 +1036,8 @@
                 checkAndUpdateHighScore(); // リアルタイムでハイスコア自動保存
             }
 
-            // スコアに応じて障害物スピードを徐々にアップ (10秒生存ごとに0.5アップ、最高12まで)
-            gameSpeed = baseSpeed + Math.min(7, Math.floor(score / 10) * 0.5);
-
             // ステージ進行の監視（30点ごとに次のステージへ遷移）
-            const newStage = Math.floor(score / 30);
+            const newStage = getStageIndex(score);
             if (newStage !== currentStageIndex) {
                 showStageBanner(newStage);
             }
@@ -919,10 +1045,10 @@
             // ステージバナーのアニメーション更新
             if (stageBanner.timer > 0) {
                 stageBanner.timer--;
-                if (stageBanner.timer < 30) {
-                    stageBanner.alpha = stageBanner.timer / 30;
-                } else if (stageBanner.timer > 130) {
-                    stageBanner.alpha = (150 - stageBanner.timer) / 20;
+                if (stageBanner.timer < 18) {
+                    stageBanner.alpha = stageBanner.timer / 18;
+                } else if (stageBanner.timer > 72) {
+                    stageBanner.alpha = (90 - stageBanner.timer) / 18;
                 } else {
                     stageBanner.alpha = 1.0;
                 }
@@ -940,16 +1066,20 @@
                 star.twinkle += 0.06;
             }
 
-            // 宇宙空間ステージ（SPACE: 90〜119点、および210〜239点...）での流れ星生成・更新
-            const currentThemeType = STAGE_THEMES[currentStageIndex % 4].type;
-            if (currentThemeType === "space" || (currentThemeType === "night" && (score % 30) >= 22)) {
-                if (Math.random() < 0.025 && shootingStars.length < 2) {
+            // 宇宙・オーロラ・銀河ステージの流れ星
+            const currentThemeType = STAGE_THEMES[currentStageIndex].type;
+            const isGalaxy = currentThemeType === "galaxy";
+            if (currentThemeType === "space" || currentThemeType === "aurora" || isGalaxy ||
+                (currentThemeType === "night" && (score % 30) >= 22)) {
+                const shootingStarChance = isGalaxy ? 0.12 : 0.025;
+                const maxShootingStars = isGalaxy ? 8 : 2;
+                if (Math.random() < shootingStarChance && shootingStars.length < maxShootingStars) {
                     shootingStars.push({
                         x: Math.random() * 320 + 200,
                         y: Math.random() * 70 + 10,
-                        vx: -6.5,
-                        vy: 3.2,
-                        length: 32,
+                        vx: isGalaxy ? -7.5 : -6.5,
+                        vy: isGalaxy ? 2.8 : 3.2,
+                        length: isGalaxy ? 46 : 32,
                         alpha: 1.0
                     });
                 }
@@ -958,7 +1088,7 @@
                 const ss = shootingStars[i];
                 ss.x += ss.vx;
                 ss.y += ss.vy;
-                ss.alpha -= 0.022;
+                ss.alpha -= currentThemeType === "galaxy" ? 0.012 : 0.022;
                 if (ss.alpha <= 0 || ss.x < 0 || ss.y > groundY) {
                     shootingStars.splice(i, 1);
                 }
@@ -1007,8 +1137,7 @@
             if (spawnTimer >= nextSpawnInterval) {
                 spawnObstacle();
                 spawnTimer = 0;
-                const speedFactor = baseSpeed / gameSpeed;
-                nextSpawnInterval = Math.floor((Math.random() * 45 + 55) * speedFactor);
+                nextSpawnInterval = Math.floor(Math.random() * 45 + 55);
             }
 
             // 3. コイン（黄金のお魚）の出現制御
@@ -1093,19 +1222,23 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             // スコアに基づくステージ・テーマ計算と滑らかなカラーブレンド
-            const stageIdx = Math.floor(score / 30);
-            const themeIdx = stageIdx % 4;
-            const nextThemeIdx = (stageIdx + 1) % 4;
+            const stageIdx = getStageIndex(score);
+            const themeIdx = stageIdx;
+            const nextThemeIdx = Math.min(stageIdx + 1, LAST_STAGE_INDEX);
             const currTheme = STAGE_THEMES[themeIdx];
             const nextTheme = STAGE_THEMES[nextThemeIdx];
 
-            // 各ステージの後半（22点〜30点）にかけて次の景色の色へ滑らかにブレンド
             const rem = score % 30;
             let blendT = 0;
-            if (rem >= 22) {
+            if (stageIdx < LAST_STAGE_INDEX && rem >= 22) {
                 blendT = (rem - 22 + (scoreTicks / 60)) / 8;
                 blendT = Math.min(1, Math.max(0, blendT));
             }
+            const themeAlpha = (type) => {
+                if (currTheme.type === type) return 1 - blendT;
+                if (nextTheme.type === type) return blendT;
+                return 0;
+            };
 
             const curSkyTop = lerpColor(currTheme.skyTop, nextTheme.skyTop, blendT);
             const curSkyBottom = lerpColor(currTheme.skyBottom, nextTheme.skyBottom, blendT);
@@ -1121,10 +1254,24 @@
             ctx.fillStyle = skyGrad;
             ctx.fillRect(0, 0, canvas.width, groundY);
 
+            const magicSkyAlpha = themeAlpha("rainbow");
+            if (magicSkyAlpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = magicSkyAlpha;
+                const magicSkyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
+                magicSkyGrad.addColorStop(0, "rgba(132, 127, 198, 0.78)");
+                magicSkyGrad.addColorStop(0.42, "rgba(133, 204, 247, 0.72)");
+                magicSkyGrad.addColorStop(0.76, "rgba(248, 202, 226, 0.78)");
+                magicSkyGrad.addColorStop(1, "rgba(255, 239, 211, 0.92)");
+                ctx.fillStyle = magicSkyGrad;
+                ctx.fillRect(0, 0, canvas.width, groundY);
+                ctx.restore();
+            }
+
             // 2. 天体（太陽 / 夕日 / 月 / 星雲）の演出
             // 昼間の太陽
-            if (themeIdx === 0 && blendT < 0.8) {
-                const sunAlpha = 1 - blendT;
+            const sunAlpha = themeAlpha("day");
+            if (sunAlpha > 0) {
                 ctx.save();
                 ctx.fillStyle = `rgba(253, 224, 71, ${sunAlpha * 0.3})`;
                 ctx.beginPath();
@@ -1137,8 +1284,8 @@
                 ctx.restore();
             }
             // 夕暮れの夕日
-            if ((themeIdx === 1 && blendT < 0.8) || (themeIdx === 0 && blendT >= 0.2)) {
-                const sunsetAlpha = themeIdx === 1 ? (1 - blendT) : blendT;
+            const sunsetAlpha = themeAlpha("sunset");
+            if (sunsetAlpha > 0) {
                 ctx.save();
                 ctx.fillStyle = `rgba(251, 146, 60, ${sunsetAlpha * 0.4})`;
                 ctx.beginPath();
@@ -1151,8 +1298,8 @@
                 ctx.restore();
             }
             // 夜の三日月
-            if ((themeIdx === 2 && blendT < 0.8) || (themeIdx === 1 && blendT >= 0.3)) {
-                const moonAlpha = themeIdx === 2 ? (1 - blendT) : blendT;
+            const moonAlpha = themeAlpha("night");
+            if (moonAlpha > 0) {
                 ctx.save();
                 ctx.fillStyle = `rgba(254, 240, 138, ${moonAlpha})`;
                 ctx.beginPath();
@@ -1165,8 +1312,8 @@
                 ctx.restore();
             }
             // 宇宙の星雲ネビュラ
-            if ((themeIdx === 3) || (themeIdx === 2 && blendT >= 0.2)) {
-                const spaceAlpha = themeIdx === 3 ? (1 - blendT * 0.5) : blendT;
+            const spaceAlpha = themeAlpha("space");
+            if (spaceAlpha > 0) {
                 ctx.save();
                 const nebGrad = ctx.createRadialGradient(280, 80, 10, 280, 80, 140);
                 nebGrad.addColorStop(0, `rgba(168, 85, 247, ${spaceAlpha * 0.35})`);
@@ -1177,11 +1324,292 @@
                 ctx.restore();
             }
 
+            const auroraAlpha = themeAlpha("aurora");
+            if (auroraAlpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = auroraAlpha * 0.72;
+                ctx.lineWidth = 19;
+                ctx.lineCap = "round";
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = "#34d399";
+                for (let band = 0; band < 3; band++) {
+                    const auroraGrad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+                    auroraGrad.addColorStop(0, "rgba(16, 185, 129, 0.15)");
+                    auroraGrad.addColorStop(0.45, "rgba(52, 211, 153, 0.9)");
+                    auroraGrad.addColorStop(1, "rgba(168, 85, 247, 0.3)");
+                    ctx.strokeStyle = auroraGrad;
+                    ctx.beginPath();
+                    for (let x = 0; x <= canvas.width; x += 24) {
+                        const waveY = 48 + band * 27 +
+                            Math.sin(x * 0.016 + environmentTick * 0.025 + band) * 13 +
+                            Math.sin(x * 0.008 - environmentTick * 0.018) * 7;
+                        if (x === 0) ctx.moveTo(x, waveY);
+                        else ctx.lineTo(x, waveY);
+                    }
+                    ctx.stroke();
+                }
+                ctx.shadowBlur = 0;
+                for (const sparkle of auroraSparkles) {
+                    const alpha = 0.35 + (Math.sin(environmentTick * 0.06 + sparkle.phase) + 1) * 0.3;
+                    ctx.fillStyle = `rgba(220, 252, 231, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(sparkle.x, sparkle.y, sparkle.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            const sweetsAlpha = themeAlpha("sweets");
+            if (sweetsAlpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = sweetsAlpha;
+                const candyColors = ["#fb7185", "#f472b6", "#a78bfa", "#60a5fa", "#facc15"];
+                for (let i = 0; i < candyDecorations.length; i++) {
+                    const candy = candyDecorations[i];
+                    const color = candyColors[i % candyColors.length];
+                    ctx.save();
+                    ctx.translate(candy.x, candy.y);
+                    ctx.rotate(Math.sin(environmentTick * 0.02 + candy.phase) * 0.18);
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(-candy.size * 0.45, 0);
+                    ctx.lineTo(-candy.size, -candy.size * 0.42);
+                    ctx.lineTo(-candy.size * 0.9, candy.size * 0.42);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(0, 0, candy.size * 0.62, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(candy.size * 0.45, 0);
+                    ctx.lineTo(candy.size, -candy.size * 0.42);
+                    ctx.lineTo(candy.size * 0.9, candy.size * 0.42);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.72)";
+                    ctx.beginPath();
+                    ctx.arc(-candy.size * 0.16, -candy.size * 0.2, candy.size * 0.13, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+                for (let i = 0; i < 9; i++) {
+                    const x = 35 + i * 67;
+                    const y = 35 + (i % 3) * 31 + Math.sin(environmentTick * 0.03 + i) * 4;
+                    const color = candyColors[i % candyColors.length];
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    for (let point = 0; point < 10; point++) {
+                        const angle = -Math.PI / 2 + point * Math.PI / 5;
+                        const radius = point % 2 === 0 ? 6 : 2.8;
+                        const px = x + Math.cos(angle) * radius;
+                        const py = y + Math.sin(angle) * radius;
+                        if (point === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            const deepSeaAlpha = themeAlpha("deepSea");
+            if (deepSeaAlpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = deepSeaAlpha;
+                for (let ray = 0; ray < 5; ray++) {
+                    const topX = 45 + ray * 125 + Math.sin(environmentTick * 0.012 + ray) * 10;
+                    const rayGrad = ctx.createLinearGradient(topX, 0, topX + 40, groundY);
+                    rayGrad.addColorStop(0, "rgba(186, 230, 253, 0.28)");
+                    rayGrad.addColorStop(1, "rgba(125, 211, 252, 0)");
+                    ctx.fillStyle = rayGrad;
+                    ctx.beginPath();
+                    ctx.moveTo(topX, 0);
+                    ctx.lineTo(topX + 24, 0);
+                    ctx.lineTo(topX + 115, groundY);
+                    ctx.lineTo(topX + 55, groundY);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                for (const bubble of seaBubbles) {
+                    const bubbleGrad = ctx.createRadialGradient(
+                        bubble.x - bubble.size * 0.3, bubble.y - bubble.size * 0.35, 0,
+                        bubble.x, bubble.y, bubble.size
+                    );
+                    bubbleGrad.addColorStop(0, "rgba(224, 242, 254, 0.75)");
+                    bubbleGrad.addColorStop(0.35, "rgba(125, 211, 252, 0.22)");
+                    bubbleGrad.addColorStop(1, "rgba(56, 189, 248, 0.05)");
+                    ctx.fillStyle = bubbleGrad;
+                    ctx.strokeStyle = "rgba(186, 230, 253, 0.65)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(bubble.x, bubble.y, bubble.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            const templeAlpha = themeAlpha("temple");
+            if (templeAlpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = templeAlpha;
+                const templeGlow = ctx.createRadialGradient(300, 70, 5, 300, 70, 190);
+                templeGlow.addColorStop(0, "rgba(255, 255, 255, 0.48)");
+                templeGlow.addColorStop(0.45, "rgba(253, 224, 71, 0.2)");
+                templeGlow.addColorStop(1, "rgba(253, 224, 71, 0)");
+                ctx.fillStyle = templeGlow;
+                ctx.fillRect(80, 0, 440, groundY);
+                for (const particle of templeParticles) {
+                    const alpha = 0.3 + (Math.sin(environmentTick * 0.08 + particle.phase) + 1) * 0.32;
+                    const glow = 2 + Math.sin(environmentTick * 0.07 + particle.phase) * 1.2;
+                    ctx.fillStyle = `rgba(255, 250, 210, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, particle.size + glow, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(particle.x - particle.size * 2, particle.y);
+                    ctx.lineTo(particle.x + particle.size * 2, particle.y);
+                    ctx.moveTo(particle.x, particle.y - particle.size * 2);
+                    ctx.lineTo(particle.x, particle.y + particle.size * 2);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            const rainbowAlpha = themeAlpha("rainbow");
+            if (rainbowAlpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = rainbowAlpha * 0.65;
+                ctx.lineCap = "round";
+                const rainbowColors = [
+                    "#f6a8c9", "#ffc48e", "#fff0a8",
+                    "#b8f1d2", "#a8e7f7", "#c9b8f3"
+                ];
+                const drawArch = (band) => {
+                    ctx.beginPath();
+                    ctx.ellipse(
+                        canvas.width / 2,
+                        220,
+                        270 - band * 19,
+                        200 - band * 19,
+                        0,
+                        Math.PI,
+                        Math.PI * 2
+                    );
+                    ctx.stroke();
+                };
+
+                const rainbowGlow = ctx.createLinearGradient(35, 0, canvas.width - 35, 0);
+                rainbowGlow.addColorStop(0, "rgba(246, 168, 201, 0.58)");
+                rainbowGlow.addColorStop(0.24, "rgba(255, 196, 142, 0.62)");
+                rainbowGlow.addColorStop(0.43, "rgba(255, 240, 168, 0.64)");
+                rainbowGlow.addColorStop(0.62, "rgba(184, 241, 210, 0.65)");
+                rainbowGlow.addColorStop(0.8, "rgba(168, 231, 247, 0.62)");
+                rainbowGlow.addColorStop(1, "rgba(201, 184, 243, 0.58)");
+                ctx.strokeStyle = rainbowGlow;
+                ctx.lineWidth = 40;
+                ctx.shadowBlur = 36;
+                ctx.shadowColor = "rgba(240, 220, 255, 0.95)";
+                drawArch(0);
+
+                ctx.globalAlpha = rainbowAlpha * 0.72;
+                ctx.lineWidth = 22;
+                ctx.shadowBlur = 18;
+                for (let band = 0; band < rainbowColors.length; band++) {
+                    ctx.strokeStyle = rainbowColors[band];
+                    ctx.shadowColor = rainbowColors[band];
+                    drawArch(band);
+                }
+
+                ctx.globalAlpha = rainbowAlpha * 0.34;
+                ctx.lineWidth = 5;
+                ctx.shadowBlur = 4;
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+                for (let band = 0; band < rainbowColors.length; band++) {
+                    drawArch(band);
+                }
+
+                ctx.globalAlpha = rainbowAlpha;
+                ctx.shadowColor = "#ffffff";
+                for (const sparkle of rainbowSparkles) {
+                    const alpha = 0.25 + (Math.sin(environmentTick * 0.09 + sparkle.phase) + 1) * 0.32;
+                    ctx.globalAlpha = rainbowAlpha * alpha;
+                    ctx.shadowBlur = 4 + sparkle.size * 2;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.moveTo(sparkle.x, sparkle.y - sparkle.size * 2.4);
+                    ctx.lineTo(sparkle.x + sparkle.size * 0.35, sparkle.y - sparkle.size * 0.35);
+                    ctx.lineTo(sparkle.x + sparkle.size * 2.4, sparkle.y);
+                    ctx.lineTo(sparkle.x + sparkle.size * 0.35, sparkle.y + sparkle.size * 0.35);
+                    ctx.lineTo(sparkle.x, sparkle.y + sparkle.size * 2.4);
+                    ctx.lineTo(sparkle.x - sparkle.size * 0.35, sparkle.y + sparkle.size * 0.35);
+                    ctx.lineTo(sparkle.x - sparkle.size * 2.4, sparkle.y);
+                    ctx.lineTo(sparkle.x - sparkle.size * 0.35, sparkle.y - sparkle.size * 0.35);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            const galaxyAlpha = themeAlpha("galaxy");
+            if (galaxyAlpha > 0) {
+                ctx.save();
+                ctx.globalAlpha = galaxyAlpha * 0.9;
+                ctx.globalCompositeOperation = "screen";
+                const nebulae = [
+                    {
+                        x: 190 + Math.sin(environmentTick * 0.008) * 18,
+                        y: 82,
+                        radius: 150,
+                        color: "rgba(217, 70, 239, 0.65)",
+                        midColor: "rgba(217, 70, 239, 0.2)"
+                    },
+                    {
+                        x: 390 + Math.cos(environmentTick * 0.01) * 16,
+                        y: 105,
+                        radius: 155,
+                        color: "rgba(34, 211, 238, 0.5)",
+                        midColor: "rgba(34, 211, 238, 0.2)"
+                    },
+                    {
+                        x: 300,
+                        y: 45 + Math.sin(environmentTick * 0.006) * 12,
+                        radius: 120,
+                        color: "rgba(139, 92, 246, 0.62)",
+                        midColor: "rgba(139, 92, 246, 0.2)"
+                    }
+                ];
+                for (const nebula of nebulae) {
+                    const nebulaGrad = ctx.createRadialGradient(
+                        nebula.x, nebula.y, 0,
+                        nebula.x, nebula.y, nebula.radius
+                    );
+                    nebulaGrad.addColorStop(0, nebula.color);
+                    nebulaGrad.addColorStop(0.55, nebula.midColor);
+                    nebulaGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+                    ctx.fillStyle = nebulaGrad;
+                    ctx.fillRect(0, 0, canvas.width, groundY);
+                }
+                const galaxyColors = ["#f0abfc", "#67e8f9", "#c4b5fd", "#ffffff"];
+                for (let i = 0; i < galaxyStarfield.length; i++) {
+                    const star = galaxyStarfield[i];
+                    const alpha = 0.28 + (Math.sin(environmentTick * 0.07 + star.phase) + 1) * 0.34;
+                    ctx.globalAlpha = galaxyAlpha * alpha;
+                    ctx.fillStyle = galaxyColors[i % galaxyColors.length];
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
             // 3. 星々の描画（夜・宇宙で輝く）
             if (curStarAlpha > 0.05) {
                 for (let star of bgStars) {
                     const alpha = curStarAlpha * (0.35 + Math.sin(star.twinkle) * 0.35);
-                    if (themeIdx === 3) {
+                    if (currTheme.type === "space" || currTheme.type === "galaxy") {
                         ctx.fillStyle = (star.x % 3 === 0) ? `rgba(147, 197, 253, ${alpha})` : (star.x % 3 === 1 ? `rgba(244, 114, 182, ${alpha})` : `rgba(253, 224, 71, ${alpha})`);
                     } else {
                         ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
@@ -1226,6 +1654,46 @@
                     ctx.arc(14, -6, 13, 0, Math.PI * 2);
                     ctx.arc(28, 0, 15, 0, Math.PI * 2);
                     ctx.arc(14, 5, 12, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            if (rainbowAlpha > 0) {
+                for (const side of [-1, 1]) {
+                    ctx.save();
+                    ctx.globalAlpha = rainbowAlpha * 0.94;
+                    ctx.translate(side < 0 ? 62 : canvas.width - 62, 205 + Math.sin(environmentTick * 0.025 + side) * 2);
+                    ctx.scale(side, 1);
+
+                    ctx.fillStyle = "rgba(187, 176, 224, 0.34)";
+                    ctx.beginPath();
+                    ctx.ellipse(0, 12, 57, 17, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    const cloudGrad = ctx.createLinearGradient(0, -38, 0, 22);
+                    cloudGrad.addColorStop(0, "rgba(255, 255, 255, 0.98)");
+                    cloudGrad.addColorStop(0.58, "rgba(255, 250, 252, 0.96)");
+                    cloudGrad.addColorStop(1, "rgba(255, 222, 237, 0.94)");
+                    ctx.fillStyle = cloudGrad;
+                    ctx.shadowColor = "rgba(255, 208, 235, 0.9)";
+                    ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    ctx.arc(-34, 8, 18, 0, Math.PI * 2);
+                    ctx.arc(-17, -3, 25, 0, Math.PI * 2);
+                    ctx.arc(8, -13, 29, 0, Math.PI * 2);
+                    ctx.arc(31, 0, 22, 0, Math.PI * 2);
+                    ctx.arc(18, 12, 23, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = "rgba(255, 196, 218, 0.7)";
+                    ctx.beginPath();
+                    ctx.ellipse(-16, -14, 23, 6, -0.15, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = "rgba(255, 238, 186, 0.82)";
+                    ctx.beginPath();
+                    ctx.ellipse(17, -22, 15, 5, 0.1, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.restore();
                 }
