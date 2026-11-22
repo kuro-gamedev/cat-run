@@ -22,11 +22,17 @@
             touch-action: manipulation;
         }
 
-        /* 画面右上の言語切り替えボタン */
-        .lang-btn {
+        .top-controls {
             position: absolute;
             top: 16px;
             right: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .lang-btn {
             padding: 8px 16px;
             font-size: 13px;
             font-weight: bold;
@@ -38,7 +44,6 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
             transition: all 0.2s ease;
             outline: none;
-            z-index: 100;
         }
 
         .lang-btn:hover {
@@ -46,6 +51,27 @@
             color: #ffffff;
             border-color: #fbbf24;
             transform: scale(1.05);
+        }
+
+        .sound-btn {
+            width: 40px;
+            height: 36px;
+            padding: 0;
+            border: 1px solid #4338ca;
+            border-radius: 20px;
+            background-color: rgba(30, 27, 75, 0.85);
+            color: #fbbf24;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        .sound-btn:hover {
+            background-color: #4338ca;
+            color: #ffffff;
+            border-color: #fbbf24;
         }
 
         .game-container {
@@ -195,8 +221,10 @@
 
 <body>
 
-    <!-- 画面右上の言語切り替えボタン -->
-    <button id="langToggleBtn" class="lang-btn" aria-label="Switch Language">JP / EN</button>
+    <div class="top-controls">
+        <button id="langToggleBtn" class="lang-btn" aria-label="Switch Language">JP / EN</button>
+        <button id="soundToggleBtn" class="sound-btn" type="button" aria-label="Mute sound" aria-pressed="false">🔊</button>
+    </div>
 
     <div class="game-container">
         <canvas id="gameCanvas" width="600" height="300"></canvas>
@@ -230,6 +258,8 @@
                 titleLogo: "黒ネコの大冒険！",
                 titlePlay: "PLAY（スタート）",
                 titleGuide: "タップ / クリック / Space / ↑キーで開始・ジャンプ\n空中でもう一度押すと2段ジャンプ！",
+                soundOn: "音をオンにする",
+                soundOff: "音をミュート",
                 gameOver: "GAME OVER",
                 retry: "もう一度遊ぶ",
                 scoreLabel: "スコア",
@@ -242,6 +272,8 @@
                 titleLogo: "Kuro Cat Run!",
                 titlePlay: "PLAY",
                 titleGuide: "Tap / Click / Space / ↑ to start or jump\nJump again in the air for a double jump!",
+                soundOn: "Turn sound on",
+                soundOff: "Mute sound",
                 gameOver: "GAME OVER",
                 retry: "RETRY",
                 scoreLabel: "SCORE",
@@ -364,10 +396,30 @@
         const finalBestLabel = document.getElementById("finalBestLabel");
         const retryBtn = document.getElementById("retryBtn");
         const langToggleBtn = document.getElementById("langToggleBtn");
+        const soundToggleBtn = document.getElementById("soundToggleBtn");
         const titleScreen = document.getElementById("titleScreen");
         const titleLogo = document.getElementById("titleLogo");
         const titlePlayBtn = document.getElementById("titlePlayBtn");
         const titleGuide = document.getElementById("titleGuide");
+        const MUTE_STORAGE_KEY = "blackCatJump_muted";
+
+        function loadMutedState() {
+            try {
+                return localStorage.getItem(MUTE_STORAGE_KEY) === "true";
+            } catch (error) {
+                console.warn("Could not load mute setting from localStorage:", error);
+                return false;
+            }
+        }
+
+        let isMuted = loadMutedState();
+
+        function updateSoundButton() {
+            const t = i18n[currentLang];
+            soundToggleBtn.textContent = isMuted ? "🔇" : "🔊";
+            soundToggleBtn.setAttribute("aria-label", isMuted ? t.soundOn : t.soundOff);
+            soundToggleBtn.setAttribute("aria-pressed", isMuted.toString());
+        }
 
         function applyLanguage(lang) {
             currentLang = lang;
@@ -384,6 +436,7 @@
             titleLogo.textContent = t.titleLogo;
             titlePlayBtn.textContent = t.titlePlay;
             titleGuide.textContent = t.titleGuide;
+            updateSoundButton();
 
             // ステージバナーテキストも現在の言語に同期
             if (stageBanner) {
@@ -392,6 +445,7 @@
         }
 
         langToggleBtn.addEventListener("click", () => {
+            initAudio();
             const nextLang = currentLang === "ja" ? "en" : "ja";
             applyLanguage(nextLang);
         });
@@ -402,42 +456,94 @@
 
         // --- Web Audio API によるレトロ効果音 ---
         let audioCtx = null;
+        let masterGain = null;
 
         function initAudio() {
             if (!audioCtx) {
                 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
                 if (AudioContextClass) {
-                    audioCtx = new AudioContextClass();
+                    try {
+                        const context = new AudioContextClass();
+                        const output = context.createGain();
+                        output.gain.value = isMuted ? 0 : 1;
+                        output.connect(context.destination);
+                        audioCtx = context;
+                        masterGain = output;
+                    } catch (error) {
+                        console.error("Could not initialize Web Audio API:", error);
+                    }
+                } else {
+                    console.warn("Web Audio API is not supported in this browser.");
                 }
             }
             if (audioCtx && audioCtx.state === "suspended") {
-                audioCtx.resume();
+                const resumePromise = audioCtx.resume();
+                if (resumePromise && typeof resumePromise.catch === "function") {
+                    resumePromise.catch((error) => {
+                        console.warn("Could not resume Web Audio API:", error);
+                    });
+                }
             }
+        }
+
+        function setMuted(muted) {
+            isMuted = muted;
+            if (audioCtx && masterGain) {
+                masterGain.gain.setTargetAtTime(isMuted ? 0 : 1, audioCtx.currentTime, 0.015);
+            }
+            try {
+                localStorage.setItem(MUTE_STORAGE_KEY, isMuted.toString());
+            } catch (error) {
+                console.warn("Could not save mute setting to localStorage:", error);
+            }
+            updateSoundButton();
+        }
+
+        soundToggleBtn.addEventListener("pointerdown", (event) => {
+            event.stopPropagation();
+        });
+
+        soundToggleBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            initAudio();
+            setMuted(!isMuted);
+        });
+
+        function playTone(frequency, startTime, duration, type, volume) {
+            const oscillator = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            oscillator.type = type;
+            oscillator.frequency.setValueAtTime(frequency, startTime);
+            gain.gain.setValueAtTime(0.0001, startTime);
+            gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+            oscillator.connect(gain);
+            gain.connect(masterGain);
+            oscillator.start(startTime);
+            oscillator.stop(startTime + duration + 0.01);
         }
 
         // 1段目ジャンプ音「ピョコッ」
         function playJumpSound() {
             try {
                 initAudio();
-                if (!audioCtx) return;
+                if (!audioCtx || !masterGain || isMuted) return;
 
+                const now = audioCtx.currentTime;
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
-
-                osc.type = "sine";
-                const now = audioCtx.currentTime;
-
-                osc.frequency.setValueAtTime(200, now);
-                osc.frequency.exponentialRampToValueAtTime(650, now + 0.12);
-
-                gain.gain.setValueAtTime(0.25, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-
+                osc.type = "square";
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(680, now + 0.14);
+                gain.gain.setValueAtTime(0.0001, now);
+                gain.gain.exponentialRampToValueAtTime(0.22, now + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
                 osc.connect(gain);
-                gain.connect(audioCtx.destination);
-
+                gain.connect(masterGain);
                 osc.start(now);
-                osc.stop(now + 0.12);
+                osc.stop(now + 0.17);
             } catch (e) {
                 console.error("Audio error:", e);
             }
@@ -447,26 +553,11 @@
         function playDoubleJumpSound() {
             try {
                 initAudio();
-                if (!audioCtx) return;
+                if (!audioCtx || !masterGain || isMuted) return;
 
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-
-                osc.type = "sine";
                 const now = audioCtx.currentTime;
-
-                // 450Hz から 950Hz へ急上昇
-                osc.frequency.setValueAtTime(450, now);
-                osc.frequency.exponentialRampToValueAtTime(950, now + 0.12);
-
-                gain.gain.setValueAtTime(0.25, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
-
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-
-                osc.start(now);
-                osc.stop(now + 0.12);
+                playTone(740, now, 0.11, "triangle", 0.2);
+                playTone(1100, now + 0.09, 0.14, "triangle", 0.2);
             } catch (e) {
                 console.error("Audio error:", e);
             }
@@ -476,54 +567,37 @@
         function playCoinSound() {
             try {
                 initAudio();
-                if (!audioCtx) return;
+                if (!audioCtx || !masterGain || isMuted) return;
 
                 const now = audioCtx.currentTime;
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-
-                osc.type = "sine";
-                // B5 (988Hz) -> E6 (1319Hz)
-                osc.frequency.setValueAtTime(988, now);
-                osc.frequency.setValueAtTime(1319, now + 0.08);
-
-                gain.gain.setValueAtTime(0.22, now);
-                gain.gain.setValueAtTime(0.26, now + 0.08);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
-
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-
-                osc.start(now);
-                osc.stop(now + 0.32);
+                playTone(988, now, 0.14, "sine", 0.22);
+                playTone(1319, now + 0.11, 0.2, "sine", 0.24);
             } catch (e) {
                 console.error("Audio error:", e);
             }
         }
 
-        // ゲームオーバー音「ブー」
+        // ゲームオーバー音（階段状に下がるレトロな失敗音）
         function playGameOverSound() {
             try {
                 initAudio();
-                if (!audioCtx) return;
+                if (!audioCtx || !masterGain || isMuted) return;
 
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
-
-                osc.type = "sawtooth";
                 const now = audioCtx.currentTime;
-
-                osc.frequency.setValueAtTime(140, now);
-                osc.frequency.exponentialRampToValueAtTime(60, now + 0.35);
-
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                osc.type = "square";
+                [440, 370, 311, 220].forEach((frequency, index) => {
+                    osc.frequency.setValueAtTime(frequency, now + index * 0.1);
+                });
+                gain.gain.setValueAtTime(0.24, now);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
 
                 osc.connect(gain);
-                gain.connect(audioCtx.destination);
+                gain.connect(masterGain);
 
                 osc.start(now);
-                osc.stop(now + 0.35);
+                osc.stop(now + 0.46);
             } catch (e) {
                 console.error("Audio error:", e);
             }
@@ -712,6 +786,7 @@
         // キーボード操作（スペース・上矢印キー）
         window.addEventListener("keydown", (e) => {
             if (e.code === "Space" || e.code === "ArrowUp") {
+                if (e.target instanceof Element && e.target.closest("button")) return;
                 e.preventDefault();
                 if (gameState === GAME_STATE.TITLE) {
                     ignoreJumpUntilKeyRelease = true;
