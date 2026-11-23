@@ -697,7 +697,10 @@
         let coins = [];
         let floatingTexts = []; // +5 ポップアップ演出用
         const baseSpeed = 5;
-        const gameSpeed = baseSpeed;
+        function getGameSpeed(scoreValue) {
+            const speedStage = Math.min(Math.floor(scoreValue / 30), 6);
+            return baseSpeed * (1 + speedStage * 0.1);
+        }
         let spawnTimer = 0;
         let nextSpawnInterval = 90;
         let coinSpawnTimer = 0;
@@ -996,7 +999,7 @@
         function update() {
             environmentTick++;
             for (const candy of candyDecorations) {
-                candy.x -= gameSpeed * 0.12;
+                candy.x -= getGameSpeed(score) * 0.12;
                 candy.y = candy.baseY + Math.sin(environmentTick * 0.025 + candy.phase) * 5;
                 if (candy.x < -candy.size * 2) candy.x = canvas.width + candy.size * 2;
             }
@@ -1009,7 +1012,7 @@
                 }
             }
             for (const particle of templeParticles) {
-                particle.x -= gameSpeed * 0.08;
+                particle.x -= getGameSpeed(score) * 0.08;
                 particle.y = particle.baseY + Math.sin(environmentTick * 0.035 + particle.phase) * 7;
                 if (particle.x < -particle.size * 2) particle.x = canvas.width + particle.size * 2;
             }
@@ -1057,11 +1060,11 @@
             }
 
             // 背景演出の更新（芝生スクロール、星のきらめき、雲の流れ、ネコの歩行）
-            groundOffset = (groundOffset + gameSpeed) % 15;
+            groundOffset = (groundOffset + getGameSpeed(score)) % 15;
 
             // 星のきらめきとゆっくりスクロール
             for (let star of bgStars) {
-                star.x -= gameSpeed * 0.08;
+                star.x -= getGameSpeed(score) * 0.08;
                 if (star.x < 0) star.x += canvas.width;
                 star.twinkle += 0.06;
             }
@@ -1096,7 +1099,7 @@
 
             // 雲のスクロール（パララックス効果）
             for (let cloud of bgClouds) {
-                cloud.x -= gameSpeed * 0.25;
+                cloud.x -= getGameSpeed(score) * 0.25;
                 if (cloud.x < -60) cloud.x = canvas.width + 50;
             }
 
@@ -1151,7 +1154,7 @@
             // 4. コインの移動・当たり判定
             for (let i = coins.length - 1; i >= 0; i--) {
                 const coin = coins[i];
-                coin.x -= gameSpeed;
+                coin.x -= getGameSpeed(score);
                 coin.angle += 0.08;
                 coin.y = coin.baseY + Math.sin(coin.angle) * 5; // 上下にふわふわ浮遊
 
@@ -1189,7 +1192,7 @@
             // 6. 障害物の移動・当たり判定
             for (let i = obstacles.length - 1; i >= 0; i--) {
                 const obs = obstacles[i];
-                obs.x -= gameSpeed;
+                obs.x -= getGameSpeed(score);
 
                 // 飛行敵（カラス）の翼アニメーション
                 if (obs.type === "flying") {
